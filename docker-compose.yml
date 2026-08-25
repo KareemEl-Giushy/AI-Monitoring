@@ -12,9 +12,10 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://litellm:litellm_password@db:5432/litellm}
       - STORE_PROMPTS_IN_SPEND_LOGS=True
       - STORE_MODEL_IN_DB=True
-      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      # - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"

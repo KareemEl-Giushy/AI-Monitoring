@@ -19,7 +19,7 @@ model_list:
       use_litellm_proxy: false
       use_xai_oauth: false
       merge_reasoning_content_in_choices: false
-      api_base: os.environ/OLLAMA_API_BASE
+      api_key: os.environ/OLLAMA_API_KEY
 
   - model_name: gemini-3.6-flash
     litellm_params:
