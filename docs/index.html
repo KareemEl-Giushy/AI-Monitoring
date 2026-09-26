@@ -3,24 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LoopSnap: the circuit breaker for AI agents</title>
-<meta name="description" content="LoopSnap is a Go reverse proxy that sits between AI agents and any OpenAI-compatible API. It trips on tool-call loops, tool error storms, degenerate output and endpoint hammering, and ships with a LiteLLM, Prometheus and Grafana observability stack.">
-<meta name="theme-color" content="#0A0D12">
+<title>AI Agent Circuit Breaker by Team MarsadOps</title>
+<meta name="description" content="AI Agent Circuit Breaker is a Go reverse proxy that sits between AI agents and any OpenAI-compatible API. It trips on tool-call loops, tool error storms, degenerate output and endpoint hammering, and ships with a LiteLLM, Prometheus and Grafana observability stack.">
+<meta name="theme-color" content="#07111F">
 <meta name="color-scheme" content="dark">
 <meta property="og:type" content="website">
-<meta property="og:title" content="LoopSnap: the circuit breaker for AI agents">
-<meta property="og:description" content="Snap the loop before it burns your budget. A Go reverse proxy that stops runaway AI agents, plus an observability stack for latency, spend and errors.">
+<meta property="og:title" content="AI Agent Circuit Breaker by Team MarsadOps">
+<meta property="og:description" content="Track, analyze and protect your tokens. A Go reverse proxy that stops runaway AI agents, plus an observability stack for latency, spend and errors.">
 <meta name="twitter:card" content="summary">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <script>document.documentElement.classList.add('js');</script>
 <style>
 :root{
-  --ink:#0A0D12; --panel:#11161F; --deep:#0D1118; --line:#1F2835; --line-2:#2B3647; --field:#5A6679;
-  --text:#E8ECF2; --soft:#C3CBD7; --muted:#8B96A8;
-  --amber:#FFB224; --green:#3DDC97; --red:#FF5A5F; --cyan:#4CC9F0;
+  --ink:#07111F; --panel:#112240; --deep:#0C1830; --line:#1E3557; --line-2:#2A4670; --field:#5E7696;
+  --text:#EAF4FF; --soft:#C9D8EC; --muted:#8FA6C4;
+  --amber:#4CB2FF; --green:#34D399; --red:#FF5A67; --cyan:#60D0E4;
   --sans:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --gut:16px;
@@ -47,10 +48,12 @@ button{font:inherit;color:inherit}
 @media (min-width:1024px){:root{--gut:32px}}
 
 /* ---------- nav ---------- */
-.site-head{position:sticky;top:0;z-index:50;background:rgba(10,13,18,.9);border-bottom:1px solid var(--line);backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px)}
+.site-head{position:sticky;top:0;z-index:50;background:rgba(7,17,31,.9);border-bottom:1px solid var(--line);backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px)}
 .nav{display:flex;align-items:center;gap:20px;height:60px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-weight:800;font-stretch:118%;font-size:1.125rem;letter-spacing:-.01em;margin-right:auto}
-.brand svg{width:30px;height:30px;flex:none}
+.brand svg,.brand img{width:30px;height:30px;flex:none}
+.brand .bn{white-space:nowrap}
+@media (max-width:560px){.brand .bn-pre{display:none}}
 .nav-links{display:flex;gap:4px;list-style:none;margin:0;padding:0}
 .nav-links a{display:block;padding:8px 10px;color:var(--soft);text-decoration:none;font-size:.9375rem;border-radius:6px}
 .nav-links a:hover{color:var(--text);background:var(--panel)}
@@ -82,7 +85,7 @@ h3{font-weight:700;font-stretch:108%;font-size:1.1875rem;line-height:1.25;letter
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:12px 20px;border-radius:8px;font-weight:700;font-size:1rem;text-decoration:none;border:1px solid transparent;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
 .btn svg{width:18px;height:18px}
 .btn-primary{background:var(--amber);color:var(--ink)}
-.btn-primary:hover{background:#FFC24F}
+.btn-primary:hover{background:#6BBEFF}
 .btn-ghost{border-color:var(--line-2);color:var(--text);background:transparent}
 .btn-ghost:hover{border-color:var(--amber)}
 
@@ -108,7 +111,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .inst[data-state="tripped"] .state{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
 .scope{height:44px;border-bottom:1px solid var(--line);background:var(--deep)}
 .scope svg{width:100%;height:100%}
-.scope .grat{stroke:#18202C;stroke-width:1}
+.scope .grat{stroke:#16284A;stroke-width:1}
 .scope .trace path{fill:none;stroke:var(--green);stroke-width:1.6}
 .scope .trace{animation:scroll 3.2s linear infinite}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-100px)}}
@@ -131,7 +134,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .t-p{color:var(--amber)}
 .t-dim{color:var(--muted)}
 .t-com{color:var(--muted)}
-.t-chk{color:#FFCB6B}
+.t-chk{color:#8FD0FF}
 .t-ok{color:var(--green)}
 .t-bad{color:var(--red);font-weight:600}
 .t-args{color:var(--text)}
@@ -147,9 +150,9 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (max-width:899px){.bk-plate-txt{text-align:center}}
 
 /* breaker lever (shared) */
-.lever{--h:112px;--w:64px;display:inline-block;position:relative;width:var(--w);height:var(--h);flex:none;border-radius:10px;background:#07090D;border:1px solid var(--line-2);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 1px 0 rgba(0,0,0,.6);padding:0}
-.lever::before{content:"";position:absolute;left:50%;top:12px;bottom:12px;width:12px;transform:translateX(-50%);border-radius:6px;background:#000;box-shadow:inset 0 0 0 1px #1B2330}
-.lever .handle{position:absolute;left:9px;right:9px;top:10px;height:calc(var(--h)*.36);border-radius:6px;background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 2px,transparent 2px 6px),linear-gradient(180deg,#FFC658,#F0A012);box-shadow:0 2px 0 #7A4E00,inset 0 1px 0 rgba(255,255,255,.4);transition:transform .24s cubic-bezier(.34,1.7,.55,1)}
+.lever{--h:112px;--w:64px;display:inline-block;position:relative;width:var(--w);height:var(--h);flex:none;border-radius:10px;background:#050C17;border:1px solid var(--line-2);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 1px 0 rgba(0,0,0,.6);padding:0}
+.lever::before{content:"";position:absolute;left:50%;top:12px;bottom:12px;width:12px;transform:translateX(-50%);border-radius:6px;background:#000;box-shadow:inset 0 0 0 1px #1A2D4D}
+.lever .handle{position:absolute;left:9px;right:9px;top:10px;height:calc(var(--h)*.36);border-radius:6px;background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 2px,transparent 2px 6px),linear-gradient(180deg,#7CC6FF,#2E9BF0);box-shadow:0 2px 0 #0B3A66,inset 0 1px 0 rgba(255,255,255,.4);transition:transform .24s cubic-bezier(.34,1.7,.55,1)}
 .lever .on,.lever .off{position:absolute;left:0;right:0;text-align:center;font:600 .5625rem/1 var(--mono);letter-spacing:.08em;color:var(--muted)}
 .lever .on{top:-15px}.lever .off{bottom:-15px}
 [data-state="tripped"] .lever .handle{transform:translateY(calc(var(--h)*.64 - 20px))}
@@ -201,7 +204,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (min-width:760px){.diagram .wide{display:block}.diagram .tall{display:none}}
 .diagram .tall{max-width:380px;margin-inline:auto}
 .d-box{fill:var(--panel);stroke:var(--line-2);stroke-width:1.2}
-.d-hot{fill:#1A1710;stroke:var(--amber);stroke-width:2}
+.d-hot{fill:#0E1D33;stroke:var(--amber);stroke-width:2}
 .d-cy{stroke:var(--cyan)}
 .d-dash{fill:none;stroke:var(--line-2);stroke-dasharray:5 5}
 .d-t{font:700 17px var(--sans);fill:var(--text)}
@@ -236,7 +239,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (max-width:819px){.bks{grid-template-columns:minmax(0,1fr)}}
 .bk{scroll-margin-top:80px;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;display:flex;flex-direction:column;min-width:0;transition:border-color .2s}
 .bk[data-state="tripped"]{border-color:color-mix(in srgb,var(--red) 55%,transparent)}
-.bk-face{display:flex;flex-direction:column;align-items:center;gap:22px;padding:16px 12px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#141A24,var(--panel))}
+.bk-face{display:flex;flex-direction:column;align-items:center;gap:22px;padding:16px 12px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#12213A,var(--panel))}
 .bk-top{align-self:stretch;display:flex;justify-content:space-between;align-items:center;font:600 .8125rem/1 var(--mono);letter-spacing:.06em;color:var(--text)}
 .bk-top .led{color:var(--green)}
 .bk[data-state="tripped"] .bk-top .led{color:var(--red)}
@@ -312,7 +315,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .codebox pre{margin:0;padding:16px;overflow:auto;font-size:.78125rem;line-height:1.6;color:var(--soft);tab-size:2}
 .codebox figcaption{padding:10px 14px;border-top:1px solid var(--line);font-size:.8125rem;color:var(--muted)}
 .j-k{color:var(--cyan)}
-.j-s{color:#D5DCE6}
+.j-s{color:#D6E4F5}
 .j-n{color:var(--amber)}
 .j-hot{color:var(--red);font-weight:600}
 .j-p{color:var(--muted)}
@@ -419,12 +422,12 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
-    <marker id="ah-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#FFB224"/></marker>
-    <marker id="ah-c" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4CC9F0"/></marker>
-    <marker id="ah-r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#FF5A5F"/></marker>
-    <marker id="ah-m" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8B96A8"/></marker>
+    <marker id="ah-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4CB2FF"/></marker>
+    <marker id="ah-c" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#60D0E4"/></marker>
+    <marker id="ah-r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#FF5A67"/></marker>
+    <marker id="ah-m" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8FA6C4"/></marker>
     <mask id="snapcut"><rect width="32" height="32" fill="#fff"/><rect x="-1.7" y="-5" width="3.4" height="10" fill="#000" transform="translate(27.4 11.6) rotate(45)"/></mask>
-    <symbol id="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#11161F" stroke="#2B3647"/><path d="M16 16C18.5 11 21 9.5 23 9.5C26.6 9.5 28.6 12.6 28.6 16S26.6 22.5 23 22.5C21 22.5 18.5 21 16 16S11 9.5 9 9.5C5.4 9.5 3.4 12.6 3.4 16S5.4 22.5 9 22.5C11 22.5 13.5 21 16 16Z" fill="none" stroke="#FFB224" stroke-width="3.2" stroke-linejoin="round" mask="url(#snapcut)"/></symbol>
+    <symbol id="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#112240" stroke="#2A4670"/><path d="M16 16C18.5 11 21 9.5 23 9.5C26.6 9.5 28.6 12.6 28.6 16S26.6 22.5 23 22.5C21 22.5 18.5 21 16 16S11 9.5 9 9.5C5.4 9.5 3.4 12.6 3.4 16S5.4 22.5 9 22.5C11 22.5 13.5 21 16 16Z" fill="none" stroke="#4CB2FF" stroke-width="3.2" stroke-linejoin="round" mask="url(#snapcut)"/></symbol>
     <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
     <symbol id="i-copy" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3"/></symbol>
     <symbol id="i-replay" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M2.5 8a5.5 5.5 0 1 0 1.7-4M2.5 2v3.5H6"/></symbol>
@@ -433,7 +436,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
 <header class="site-head">
   <nav class="wrap nav" aria-label="Primary">
-    <a class="brand" href="#top" aria-label="LoopSnap, back to top"><svg aria-hidden="true"><use href="#mark"/></svg>LoopSnap</a>
+    <a class="brand" href="#top" aria-label="AI Agent Circuit Breaker, back to top"><img src="logo-64.png" alt="" width="30" height="30"><span class="bn"><span class="bn-pre">AI Agent </span>Circuit Breaker</span></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="#how">How it works</a></li>
@@ -441,7 +444,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
       <li><a href="#observability">Observability</a></li>
       <li><a href="#quickstart">Quick start</a></li>
     </ul>
-    <a class="gh" href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker" aria-label="LoopSnap on GitHub"><svg aria-hidden="true"><use href="#gh"/></svg><span class="gh-text">GitHub</span></a>
+    <a class="gh" href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker" aria-label="AI Agent Circuit Breaker on GitHub"><svg aria-hidden="true"><use href="#gh"/></svg><span class="gh-text">GitHub</span></a>
   </nav>
 </header>
 
@@ -451,9 +454,9 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap">
     <div class="hero-top">
-      <h1 id="hero-title">Snap the loop before it burns your budget.</h1>
+      <h1 id="hero-title">Stop runaway AI agents before they burn your budget.</h1>
       <div>
-        <p class="hero-sub">LoopSnap is the circuit breaker for AI agents: a Go reverse proxy that sits between your agents and any OpenAI-compatible API, stops runaway agents mid-stream, and comes with an observability stack for latency, spend and errors.</p>
+        <p class="hero-sub">The circuit breaker for AI agents, by Team MarsadOps: a Go reverse proxy that sits between your agents and any OpenAI-compatible API, stops runaway agents mid-stream, and comes with an observability stack for latency, spend and errors.</p>
         <div class="cta">
           <a class="btn btn-primary" href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker"><svg aria-hidden="true"><use href="#gh"/></svg>View on GitHub</a>
           <a class="btn btn-ghost" href="#quickstart">Quick start</a>
@@ -463,7 +466,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
     <figure class="inst" id="inst" data-state="tripped" aria-labelledby="inst-cap">
       <div class="inst-head">
-        <span class="inst-name"><b>loopsnap proxy</b> <span class="nw">:8080 &rarr; litellm :4000</span></span>
+        <span class="inst-name"><b>circuit breaker proxy</b> <span class="nw">:8080 &rarr; litellm :4000</span></span>
         <span class="state"><span class="led" aria-hidden="true"></span><span class="sr-only">Circuit state: </span><span data-ro="state">OPEN_TRIPPED</span></span>
       </div>
       <div class="scope" aria-hidden="true">
@@ -550,7 +553,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
           </ul>
         </div>
         <div class="us">
-          <h4>LoopSnap</h4>
+          <h4>AI Agent Circuit Breaker</h4>
           <p>Compares what the agent is doing. The same two calls share most of their character 3-grams, so they count as one repeated action.</p>
           <ul class="hashes">
             <li>jaccard(attempt 0, attempt 1)<br><span class="good">0.887 &ge; 0.85 &rarr; same call</span></li>
@@ -566,12 +569,12 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band" id="how" aria-labelledby="how-title">
   <div class="wrap">
     <h2 id="how-title">One proxy between your agents and the model API</h2>
-    <p class="lede">Point your agent&rsquo;s base URL at LoopSnap instead of the model API. It forwards every path and query unchanged to the LiteLLM gateway, which routes each request to Groq, Gemini or Ollama. LiteLLM&rsquo;s metrics flow into Prometheus and Grafana.</p>
+    <p class="lede">Point your agent&rsquo;s base URL at the breaker proxy instead of the model API. It forwards every path and query unchanged to the LiteLLM gateway, which routes each request to Groq, Gemini or Ollama. LiteLLM&rsquo;s metrics flow into Prometheus and Grafana.</p>
 
     <figure class="diagram" style="margin-inline:0">
       <svg class="wide" viewBox="0 0 1120 400" role="img" aria-labelledby="dw-t dw-d">
-        <title id="dw-t">LoopSnap architecture</title>
-        <desc id="dw-d">An AI agent sends requests to the LoopSnap proxy on port 8080. The proxy forwards them to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. When a breaker trips, the proxy answers the agent with HTTP 429 and an incident. The proxy writes terminal alerts and conversation audit files. LiteLLM exposes metrics that Prometheus on port 9090 scrapes and Grafana on port 3000 displays.</desc>
+        <title id="dw-t">AI Agent Circuit Breaker architecture</title>
+        <desc id="dw-d">An AI agent sends requests to the circuit breaker proxy on port 8080. The proxy forwards them to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. When a breaker trips, the proxy answers the agent with HTTP 429 and an incident. The proxy writes terminal alerts and conversation audit files. LiteLLM exposes metrics that Prometheus on port 9090 scrapes and Grafana on port 3000 displays.</desc>
         <!-- agent -->
         <rect class="d-box" x="10" y="62" width="190" height="96" rx="8"/>
         <text class="d-t" x="28" y="98">AI agent / app</text>
@@ -584,7 +587,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         <text class="d-mr" x="226" y="150">429</text>
         <!-- proxy -->
         <rect class="d-hot" x="300" y="34" width="280" height="156" rx="10"/>
-        <text class="d-t" x="320" y="68">LoopSnap proxy</text>
+        <text class="d-t" x="320" y="68">Circuit breaker proxy</text>
         <text class="d-m" x="320" y="90">:8080  Go reverse proxy</text>
         <g transform="translate(320 110)">
           <rect class="mini-b" x="0" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="18" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="12" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="22" y="54" text-anchor="middle">01</text>
@@ -638,8 +641,8 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
       </svg>
 
       <svg class="tall" viewBox="0 0 360 600" role="img" aria-labelledby="dt-t dt-d">
-        <title id="dt-t">LoopSnap architecture</title>
-        <desc id="dt-d">An AI agent sends requests to the LoopSnap proxy on port 8080, which answers with HTTP 429 and an incident when a breaker trips. The proxy forwards to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. LiteLLM metrics go to Prometheus on port 9090 and then to Grafana on port 3000.</desc>
+        <title id="dt-t">AI Agent Circuit Breaker architecture</title>
+        <desc id="dt-d">An AI agent sends requests to the circuit breaker proxy on port 8080, which answers with HTTP 429 and an incident when a breaker trips. The proxy forwards to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. LiteLLM metrics go to Prometheus on port 9090 and then to Grafana on port 3000.</desc>
         <rect class="d-box" x="60" y="6" width="240" height="64" rx="8"/>
         <text class="d-t" x="180" y="34" text-anchor="middle">AI agent / app</text>
         <text class="d-m" x="180" y="55" text-anchor="middle">base_url :8080/v1</text>
@@ -647,7 +650,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         <path class="d-ln d-lr" d="M210 110V74" marker-end="url(#ah-r)"/>
         <text class="d-mr" x="220" y="98">429</text>
         <rect class="d-hot" x="20" y="118" width="320" height="142" rx="10"/>
-        <text class="d-t" x="180" y="148" text-anchor="middle">LoopSnap proxy</text>
+        <text class="d-t" x="180" y="148" text-anchor="middle">Circuit breaker proxy</text>
         <text class="d-m" x="180" y="168" text-anchor="middle">:8080  alerts + audit JSON</text>
         <g transform="translate(40 184)">
           <rect class="mini-b" x="0" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="20" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="14" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="24" y="54" text-anchor="middle">01</text>
@@ -701,7 +704,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
     <p class="lede">Each detector watches for one way an agent runs away. Every threshold below is the shipped default and can be changed with a flag, an environment variable or <code>config.yaml</code>. Flip a lever to see what that breaker reports when it trips.</p>
 
     <div class="board">
-      <div class="board-plate" aria-hidden="true"><span>LoopSnap main panel</span><span>5 circuits</span></div>
+      <div class="board-plate" aria-hidden="true"><span>MarsadOps main panel</span><span>5 circuits</span></div>
       <ul class="bks">
         <li class="bk" id="cb-01" data-state="closed" data-open="OPEN_TRIPPED">
           <div class="bk-face">
@@ -860,7 +863,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         </div>
         <div>
           <dt class="c-amb"><code>SSE</code> Mid-stream</dt>
-          <dd>When a live streamed response trips a breaker, LoopSnap closes the upstream stream and appends an <code>event: error</code> frame carrying the same incident, instead of <code>[DONE]</code>. The status stays 200 because the headers were already sent.</dd>
+          <dd>When a live streamed response trips a breaker, the proxy closes the upstream stream and appends an <code>event: error</code> frame carrying the same incident, instead of <code>[DONE]</code>. The status stays 200 because the headers were already sent.</dd>
         </div>
       </dl>
       <ul class="fields">
@@ -918,10 +921,10 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band obs" id="observability" aria-labelledby="obs-title">
   <div class="wrap">
     <h2 id="obs-title">Prevention in the proxy, visibility in Grafana</h2>
-    <p class="lede">LoopSnap stops a runaway agent while it&rsquo;s happening. The observability stack shows what your agents cost and how each model behaves over hours and days.</p>
+    <p class="lede">The circuit breaker stops a runaway agent while it&rsquo;s happening. The observability stack shows what your agents cost and how each model behaves over hours and days.</p>
 
     <div class="pv">
-      <div><h3><span class="led" aria-hidden="true"></span>Prevention: LoopSnap proxy</h3><p>Acts on the request in flight. Blocks loops, error storms, degenerate output and runaway velocity, and returns an incident the agent can act on.</p></div>
+      <div><h3><span class="led" aria-hidden="true"></span>Prevention: circuit breaker proxy</h3><p>Acts on the request in flight. Blocks loops, error storms, degenerate output and runaway velocity, and returns an incident the agent can act on.</p></div>
       <div class="vis"><h3><span class="led" aria-hidden="true"></span>Visibility: observability stack</h3><p>Records every call that reaches the gateway. Latency, time to first byte, spend, tokens, errors and failed fallbacks, per model.</p></div>
     </div>
 
@@ -955,7 +958,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
           <li><b>Failed Fallbacks</b><span>Top 10 and the last 25</span><code>litellm_<wbr>deployment_<wbr>failed_<wbr>fallbacks_<wbr>total</code></li>
           <li><b>LLM Deployment Analytics</b><span>Health of each model deployment</span><code>litellm_<wbr>deployment_<wbr>state</code></li>
         </ul>
-        <p class="note">Requests LoopSnap rejects never reach LiteLLM, so their incidents appear in the proxy&rsquo;s 429 responses and terminal alerts rather than in Grafana.</p>
+        <p class="note">Requests the breaker rejects never reach LiteLLM, so their incidents appear in the proxy&rsquo;s 429 responses and terminal alerts rather than in Grafana.</p>
       </div>
     </div>
   </div>
@@ -984,13 +987,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
     <div class="tabs">
       <div class="tablist" role="tablist" aria-label="Quick start guides">
-        <button class="tab" role="tab" type="button" id="tab-proxy" aria-controls="panel-proxy" aria-selected="true" tabindex="0">LoopSnap proxy</button>
+        <button class="tab" role="tab" type="button" id="tab-proxy" aria-controls="panel-proxy" aria-selected="true" tabindex="0">Circuit breaker proxy</button>
         <button class="tab" role="tab" type="button" id="tab-stack" aria-controls="panel-stack" aria-selected="false" tabindex="-1">Observability stack</button>
         <button class="tab" role="tab" type="button" id="tab-chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1">Full chain</button>
       </div>
 
       <div class="tabpanel" role="tabpanel" id="panel-proxy" aria-labelledby="tab-proxy" tabindex="0">
-        <h3 class="pl">LoopSnap proxy</h3>
+        <h3 class="pl">Circuit breaker proxy</h3>
         <p>Needs Go 1.26 or newer. <code>go.sum</code> isn&rsquo;t committed, so run <code>go mod tidy</code> once after cloning.</p>
         <div class="code">
           <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy proxy setup commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
@@ -1037,13 +1040,13 @@ docker compose ps</code></pre>
 
       <div class="tabpanel" role="tabpanel" id="panel-chain" aria-labelledby="tab-chain" tabindex="0">
         <h3 class="pl">Full chain</h3>
-        <p>Agent &rarr; LoopSnap <code>:8080</code> &rarr; LiteLLM <code>:4000</code> &rarr; providers. Start the stack, put the proxy in front of it, then call a model through the proxy.</p>
+        <p>Agent &rarr; Circuit Breaker <code>:8080</code> &rarr; LiteLLM <code>:4000</code> &rarr; providers. Start the stack, put the proxy in front of it, then call a model through the proxy.</p>
         <div class="code">
           <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy full chain commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
 <pre tabindex="0"><code><span class="c"># Terminal 1: gateway + observability</span>
 cd AI-Monitoring &amp;&amp; docker compose up -d
 
-<span class="c"># Terminal 2: LoopSnap proxy in front of LiteLLM</span>
+<span class="c"># Terminal 2: circuit breaker proxy in front of LiteLLM</span>
 cd AI-Ciurcit-Breaker
 ./proxy-server -port 8080 -target http://localhost:4000
 
@@ -1096,11 +1099,11 @@ curl -sS http://localhost:8080/v1/chat/completions \
 <footer class="foot">
   <div class="wrap foot-grid">
     <div>
-      <a class="brand" href="#top" aria-label="LoopSnap, back to top"><svg aria-hidden="true"><use href="#mark"/></svg>LoopSnap</a>
-      <p>The circuit breaker for AI agents. Built for a DevOps hackathon.</p>
+      <a class="brand" href="#top" aria-label="AI Agent Circuit Breaker, back to top"><img src="logo-64.png" alt="" width="30" height="30"><span class="bn"><span class="bn-pre">AI Agent </span>Circuit Breaker</span></a>
+      <p>Track, analyze and protect your tokens. Built by Team MarsadOps for DevOps Hackathon Egypt 2026.</p>
     </div>
     <ul>
-      <li><a href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker">LoopSnap proxy on GitHub</a></li>
+      <li><a href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker">Circuit breaker proxy on GitHub</a></li>
       <li><a href="https://github.com/KareemEl-Giushy/AI-Monitoring">Observability stack on GitHub</a></li>
     </ul>
   </div>
