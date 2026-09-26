@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Agent Circuit Breaker by Team MarsadOps</title>
-<meta name="description" content="AI Agent Circuit Breaker is a Go reverse proxy that sits between AI agents and any OpenAI-compatible API. It trips on tool-call loops, tool error storms, degenerate output and endpoint hammering, and ships with a LiteLLM, Prometheus and Grafana observability stack.">
+<meta name="description" content="AI Agent Circuit Breaker is a Go reverse proxy with pluggable breakers that sits between AI agents and any OpenAI-compatible API. It stops tool-call loops, failing tools, request floods, known prompt-injection phrases and degenerate streamed output, and exports every decision to Prometheus and a Grafana dashboard, next to a LiteLLM observability stack.">
 <meta name="theme-color" content="#07111F">
 <meta name="color-scheme" content="dark">
 <meta property="og:type" content="website">
 <meta property="og:title" content="AI Agent Circuit Breaker by Team MarsadOps">
-<meta property="og:description" content="Track, analyze and protect your tokens. A Go reverse proxy that stops runaway AI agents, plus an observability stack for latency, spend and errors.">
+<meta property="og:description" content="Track, analyze and protect your tokens. A Go reverse proxy with pluggable breakers for loops, failing tools, request floods, prompt-injection phrases and degenerate streams, plus Prometheus and Grafana observability.">
 <meta name="twitter:card" content="summary">
-<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,7 @@
 :root{
   --ink:#07111F; --panel:#112240; --deep:#0C1830; --line:#1E3557; --line-2:#2A4670; --field:#5E7696;
   --text:#EAF4FF; --soft:#C9D8EC; --muted:#8FA6C4;
-  --amber:#4CB2FF; --green:#34D399; --red:#FF5A67; --cyan:#60D0E4;
+  --accent:#4CB2FF; --green:#34D399; --red:#FF5A67; --cyan:#60D0E4;
   --sans:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --gut:16px;
@@ -31,17 +31,17 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 body{margin:0;background:var(--ink);color:var(--text);font:400 1.0625rem/1.6 var(--sans);font-stretch:100%;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 img,svg{display:block;max-width:100%}
-a{color:var(--amber);text-underline-offset:3px;text-decoration-thickness:1px}
+a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px}
 a:hover{text-decoration-thickness:2px}
 code,kbd,pre{font-family:var(--mono)}
 code{font-size:.875em}
 p{margin:0 0 1em}
 h1,h2,h3{margin:0;font-family:var(--sans);text-wrap:balance}
 button{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:4px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 [hidden]{display:none!important}
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-.skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--amber);color:var(--ink);padding:8px 14px;border-radius:6px;font-weight:700;text-decoration:none}
+.skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--accent);color:var(--ink);padding:8px 14px;border-radius:6px;font-weight:700;text-decoration:none}
 .skip:focus{top:12px}
 .wrap{width:100%;max-width:1200px;margin-inline:auto;padding-inline:var(--gut)}
 @media (min-width:640px){:root{--gut:24px}}
@@ -58,18 +58,18 @@ button{font:inherit;color:inherit}
 .nav-links a{display:block;padding:8px 10px;color:var(--soft);text-decoration:none;font-size:.9375rem;border-radius:6px}
 .nav-links a:hover{color:var(--text);background:var(--panel)}
 .gh{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line-2);border-radius:8px;color:var(--text);text-decoration:none;font-size:.9375rem;font-weight:600}
-.gh:hover{border-color:var(--amber)}
+.gh:hover{border-color:var(--accent)}
 .gh svg{width:18px;height:18px}
 .menu-btn{display:none;background:none;border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;font-size:.9375rem;font-weight:600;cursor:pointer}
-@media (max-width:879px){
+@media (max-width:959px){
   .js .menu-btn{display:inline-flex}
   .js .nav-links{display:none;position:absolute;left:0;right:0;top:60px;flex-direction:column;gap:0;background:var(--ink);border-bottom:1px solid var(--line);padding:8px var(--gut) 16px}
   .js .nav-links.open{display:flex}
   .js .nav-links a{padding:12px 4px;font-size:1rem;border-bottom:1px solid var(--line);border-radius:0}
   .nav-links{flex-wrap:wrap}
   .gh-text{display:none}
+  .nav{gap:10px}
 }
-@media (max-width:879px){.nav{gap:10px}}
 
 /* ---------- shared section scaffolding ---------- */
 .band{padding-block:clamp(64px,9vw,120px);border-top:1px solid var(--line)}
@@ -81,13 +81,14 @@ h3{font-weight:700;font-stretch:108%;font-size:1.1875rem;line-height:1.25;letter
 .split{display:grid;gap:40px}
 .split>*{min-width:0}
 @media (min-width:960px){.split{grid-template-columns:5fr 7fr;gap:64px}}
+.sub-h{margin-top:clamp(48px,6vw,72px);margin-bottom:20px;font-size:clamp(1.375rem,1.1rem + 1vw,1.75rem);font-stretch:112%;font-weight:800}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:12px 20px;border-radius:8px;font-weight:700;font-size:1rem;text-decoration:none;border:1px solid transparent;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
 .btn svg{width:18px;height:18px}
-.btn-primary{background:var(--amber);color:var(--ink)}
+.btn-primary{background:var(--accent);color:var(--ink)}
 .btn-primary:hover{background:#6BBEFF}
 .btn-ghost{border-color:var(--line-2);color:var(--text);background:transparent}
-.btn-ghost:hover{border-color:var(--amber)}
+.btn-ghost:hover{border-color:var(--accent)}
 
 /* ---------- hero ---------- */
 .hero{padding-block:clamp(40px,7vw,88px) clamp(56px,8vw,104px)}
@@ -117,7 +118,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-100px)}}
 .scope .gap{fill:var(--deep);opacity:0}
 .scope .dead{stroke:var(--red);stroke-width:1.6;opacity:0}
-.scope .edge{stroke:var(--amber);stroke-width:1.6;opacity:0}
+.scope .edge{stroke:var(--accent);stroke-width:1.6;opacity:0}
 .inst[data-state="tripped"] .scope .trace{animation-play-state:paused}
 .inst[data-state="tripped"] .scope .trace path{stroke:var(--muted)}
 .inst[data-state="tripped"] .scope .gap,.inst[data-state="tripped"] .scope .dead,.inst[data-state="tripped"] .scope .edge{opacity:1}
@@ -131,7 +132,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .term li{white-space:pre-wrap;overflow-wrap:anywhere;padding:1px 0}
 .term li.in{animation:linein .18s ease-out}
 @keyframes linein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-.t-p{color:var(--amber)}
+.t-p{color:var(--accent)}
 .t-dim{color:var(--muted)}
 .t-com{color:var(--muted)}
 .t-chk{color:#8FD0FF}
@@ -167,13 +168,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .ro small{font:400 .75rem/1.3 var(--mono);color:var(--muted)}
 .segs{display:inline-flex;gap:4px;align-self:center}
 .segs i{width:18px;height:8px;border-radius:2px;background:var(--line-2)}
-.segs i.lit{background:var(--amber)}
+.segs i.lit{background:var(--accent)}
 .inst[data-state="tripped"] .segs i.lit{background:var(--red)}
 
 .inst-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding:14px 16px;border-top:1px solid var(--line);font-size:.875rem;color:var(--muted)}
 .inst-foot p{margin:0;max-width:78ch}
 .btn-replay{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 14px;border-radius:8px;background:var(--ink);border:1px solid var(--line-2);font:600 .8125rem/1 var(--mono);letter-spacing:.04em;cursor:pointer;color:var(--text)}
-.btn-replay:hover{border-color:var(--amber)}
+.btn-replay:hover{border-color:var(--accent)}
 .btn-replay svg{width:14px;height:14px}
 .no-js-hide{display:none}
 .js .no-js-hide{display:inline-flex}
@@ -181,7 +182,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 /* ---------- problem ---------- */
 .fails{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .fails li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:4px 16px;padding:20px 0;border-bottom:1px solid var(--line)}
-.fails .tag{grid-row:span 2;font:600 .75rem/1.9 var(--mono);color:var(--amber);letter-spacing:.04em}
+.fails .tag{grid-row:span 2;font:600 .75rem/1.9 var(--mono);color:var(--accent);letter-spacing:.04em}
 .fails .tag a{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
 .fails p{margin:0;color:var(--soft)}
 .miss{margin-top:clamp(48px,7vw,88px)}
@@ -190,13 +191,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .compare>div{background:var(--ink);padding:24px;min-width:0}
 @media (min-width:900px){.compare{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .compare h4{margin:0 0 10px;font:600 .75rem/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.compare .us h4{color:var(--amber)}
+.compare .us h4{color:var(--accent)}
 .compare p{color:var(--soft);font-size:1rem;margin:0}
 .hashes{margin:14px 0 0;padding:0;list-style:none;font:400 .75rem/1.5 var(--mono);color:var(--muted)}
 .hashes li{padding:8px 10px;background:var(--panel);border-radius:6px;margin-bottom:6px;overflow-wrap:anywhere}
 .hashes b{color:var(--text);font-weight:600}
 .hashes .hot{color:var(--red)}
-.hashes .good{color:var(--amber)}
+.hashes .good{color:var(--accent)}
 
 /* ---------- how it works ---------- */
 .diagram{margin:40px 0 0;background:var(--deep);border:1px solid var(--line);border-radius:14px;padding:clamp(12px,2.5vw,28px)}
@@ -204,29 +205,28 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (min-width:760px){.diagram .wide{display:block}.diagram .tall{display:none}}
 .diagram .tall{max-width:380px;margin-inline:auto}
 .d-box{fill:var(--panel);stroke:var(--line-2);stroke-width:1.2}
-.d-hot{fill:#0E1D33;stroke:var(--amber);stroke-width:2}
+.d-hot{fill:#0E1D33;stroke:var(--accent);stroke-width:2}
 .d-cy{stroke:var(--cyan)}
 .d-dash{fill:none;stroke:var(--line-2);stroke-dasharray:5 5}
 .d-t{font:700 17px var(--sans);fill:var(--text)}
 .d-ts{font:700 15px var(--sans);fill:var(--text)}
 .d-m{font:400 12.5px var(--mono);fill:var(--muted)}
-.d-ma{font:600 12px var(--mono);fill:var(--amber)}
+.d-ma{font:600 12px var(--mono);fill:var(--accent)}
 .d-mc{font:600 12px var(--mono);fill:var(--cyan)}
 .d-mr{font:600 12px var(--mono);fill:var(--red)}
 .d-ln{fill:none;stroke-width:2}
-.d-la{stroke:var(--amber)}
+.d-la{stroke:var(--accent)}
 .d-lc{stroke:var(--cyan)}
 .d-lr{stroke:var(--red);stroke-dasharray:6 5}
 .d-lm{stroke:var(--muted);stroke-dasharray:3 4}
-.mini-h{fill:var(--amber)}
+.mini-h{fill:var(--accent)}
 .mini-s{fill:#000}
 .mini-b{fill:var(--ink);stroke:var(--line-2)}
 .mini-l{font:600 10px var(--mono);fill:var(--muted)}
-.life-h{margin-top:clamp(48px,6vw,72px);margin-bottom:24px;font-size:clamp(1.375rem,1.1rem + 1vw,1.75rem);font-stretch:112%;font-weight:800}
 .life{list-style:none;margin:0;padding:0;display:grid;gap:0 48px;counter-reset:step}
 @media (min-width:900px){.life{grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(4,auto)}}
 .life li{counter-increment:step;display:grid;grid-template-columns:44px minmax(0,1fr);gap:0 12px;padding:18px 0;border-top:1px solid var(--line)}
-.life li::before{content:counter(step,decimal-leading-zero);font:600 .8125rem/1.7 var(--mono);color:var(--amber)}
+.life li::before{content:counter(step,decimal-leading-zero);font:600 .8125rem/1.7 var(--mono);color:var(--accent)}
 .life b{display:block;font-weight:700;margin-bottom:4px}
 .life span{color:var(--soft);font-size:1rem}
 .life code{color:var(--text)}
@@ -234,8 +234,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 /* ---------- detectors ---------- */
 .board{margin-top:40px;background:var(--deep);border:1px solid var(--line-2);border-radius:16px;padding:clamp(12px,2vw,24px);position:relative}
 .board-plate{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font:600 .6875rem/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 4px 14px}
-.bks{list-style:none;margin:0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(5,minmax(0,1fr))}
-@media (max-width:1139px){.bks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bks{list-style:none;margin:0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:819px){.bks{grid-template-columns:minmax(0,1fr)}}
 .bk{scroll-margin-top:80px;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;display:flex;flex-direction:column;min-width:0;transition:border-color .2s}
 .bk[data-state="tripped"]{border-color:color-mix(in srgb,var(--red) 55%,transparent)}
@@ -249,16 +248,41 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .bk[data-state="tripped"] .bk-st{color:var(--red)}
 .bk-body{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1}
 .bk-body p{margin:0;color:var(--soft);font-size:.9375rem;line-height:1.55}
+.bk-body .plug{font:600 .6875rem/1.3 var(--mono);letter-spacing:.04em;color:var(--muted)}
 .bk-spec{margin:auto 0 0;display:grid;gap:10px;padding-top:12px;border-top:1px dashed var(--line-2)}
 .bk-spec dt{font:600 .6875rem/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .bk-spec dd{margin:2px 0 0;font-size:.875rem;color:var(--text);line-height:1.45}
-.bk-spec code{font-size:.75rem;color:var(--amber);overflow-wrap:anywhere}
+.bk-spec code{font-size:.75rem;color:var(--accent);overflow-wrap:anywhere}
 .bk[data-state="tripped"] .bk-spec code.fc{color:var(--red)}
 @media (max-width:819px){
   .bk{flex-direction:row}
   .bk-face{width:112px;flex:none;border-bottom:0;border-right:1px solid var(--line);padding:14px 8px}
   .bk .lever{--h:84px;--w:50px}
 }
+.acts{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:20px 0 0}
+@media (min-width:760px){.acts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.acts>div{background:var(--ink);padding:18px 20px;min-width:0}
+.acts dt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700}
+.acts dt code{font-size:.75rem;padding:4px 7px;border-radius:5px;border:1px solid currentColor}
+.acts dd{margin:6px 0 0;color:var(--soft);font-size:.9375rem}
+.acts .c-red{color:var(--red)}
+.acts .c-acc{color:var(--accent)}
+.acts .c-cy{color:var(--cyan)}
+.board-foot{margin:16px 0 0;color:var(--soft);font-size:.9375rem;max-width:none}
+.board-foot b{color:var(--text)}
+
+/* ---------- extend ---------- */
+.ext{display:grid;gap:20px;margin-top:40px}
+.ext>*{min-width:0}
+.ext-card{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:clamp(16px,2.4vw,28px);min-width:0;display:grid;gap:4px 40px}
+.ext-card>*{min-width:0}
+@media (min-width:1000px){.ext-card{grid-template-columns:minmax(0,4fr) minmax(0,8fr);align-items:start}.ext-card .code:first-child{margin-top:0}}
+.ext-info .note{margin:16px 0 0}
+.ext-card h3{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ext-card h3 code{font-size:.8125rem;color:var(--accent)}
+.hooks{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px;font-size:.9375rem;color:var(--soft)}
+.hooks code{color:var(--cyan);font-size:.8125rem}
+.ext .code{margin:16px 0 0}
 
 /* ---------- try it ---------- */
 .calcs{display:grid;gap:20px;margin-top:40px}
@@ -266,19 +290,19 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (min-width:980px){.calcs{grid-template-columns:1fr 1fr}}
 .calc{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:clamp(16px,2.4vw,28px);display:flex;flex-direction:column;gap:14px;margin:0}
 .calc-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-.calc-h span{font:600 .75rem/1 var(--mono);color:var(--amber);letter-spacing:.06em}
+.calc-h span{font:600 .75rem/1 var(--mono);color:var(--accent);letter-spacing:.06em}
 .calc label{display:block;font-size:.875rem;font-weight:600;color:var(--soft);margin-bottom:6px}
 .calc textarea{width:100%;min-height:74px;resize:vertical;background:var(--ink);color:var(--text);border:1px solid var(--field);border-radius:8px;padding:10px 12px;font:400 .8125rem/1.5 var(--mono)}
-.calc textarea:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:transparent}
+.calc textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{background:var(--ink);border:1px solid var(--line-2);border-radius:999px;padding:7px 12px;font-size:.8125rem;font-weight:600;cursor:pointer;color:var(--soft);min-height:36px}
-.chip:hover{border-color:var(--amber);color:var(--text)}
+.chip:hover{border-color:var(--accent);color:var(--text)}
 .readout{background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px}
 .readout-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .big{font:600 clamp(2rem,1.5rem + 1.6vw,2.6rem)/1 var(--mono);letter-spacing:-.02em}
 .big small{font-size:.8125rem;color:var(--muted);letter-spacing:0;margin-left:6px;font-weight:400}
 .pill{font:600 .75rem/1 var(--mono);letter-spacing:.05em;padding:6px 9px;border-radius:5px;border:1px solid currentColor;white-space:nowrap}
-.v-match{color:var(--amber)}
+.v-match{color:var(--accent)}
 .v-ok{color:var(--green)}
 .v-trip{color:var(--red)}
 .v-idle{color:var(--muted)}
@@ -287,6 +311,8 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .meter .mark{position:absolute;top:-18px;bottom:-4px;width:2px;background:var(--text);transform:translateX(-1px)}
 .meter .mark span{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:600 .6875rem/1 var(--mono);color:var(--text);white-space:nowrap;padding-bottom:3px}
 .scale{display:flex;justify-content:space-between;font:400 .6875rem/1 var(--mono);color:var(--muted)}
+.ro2{display:block;font:400 .8125rem/1.45 var(--mono);color:var(--soft)}
+.ro2 b{color:var(--text);font-weight:600}
 .verdict{display:block;margin:0;font-size:.9375rem;color:var(--soft)}
 .verdict b{color:var(--text)}
 .work{font-size:.875rem;color:var(--muted)}
@@ -296,6 +322,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .work dd{margin:2px 0 0;font:400 .75rem/1.5 var(--mono);color:var(--text);overflow-wrap:anywhere}
 .hist{height:44px;display:flex;align-items:flex-end;gap:2px}
 .hist i{flex:1;background:var(--cyan);opacity:.75;min-height:1px;border-radius:1px 1px 0 0}
+.calc-note{margin:0;font-size:.8125rem;color:var(--muted)}
 .simhash-note{margin-top:24px;padding:20px;border:1px dashed var(--line-2);border-radius:12px;color:var(--soft);font-size:.9375rem;max-width:none}
 .simhash-note b{color:var(--text)}
 
@@ -306,17 +333,19 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .paths dt code{font-size:.75rem;padding:4px 7px;border-radius:5px;border:1px solid currentColor}
 .paths dd{margin:0;color:var(--soft);font-size:1rem}
 .paths .c-red{color:var(--red)}
-.paths .c-amb{color:var(--amber)}
+.paths .c-acc{color:var(--accent)}
+.paths .c-cy{color:var(--cyan)}
 .fields{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px;font-size:.9375rem;color:var(--soft)}
 .fields code{color:var(--cyan)}
-.codebox{background:var(--ink);border:1px solid var(--line-2);border-radius:12px;overflow:hidden;min-width:0}
+.boxes{display:grid;gap:16px;min-width:0}
+.codebox{background:var(--ink);border:1px solid var(--line-2);border-radius:12px;overflow:hidden;min-width:0;margin:0}
 .codebox-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel);font:600 .75rem/1.4 var(--mono);color:var(--muted)}
 .codebox-bar .st{color:var(--red)}
 .codebox pre{margin:0;padding:16px;overflow:auto;font-size:.78125rem;line-height:1.6;color:var(--soft);tab-size:2}
 .codebox figcaption{padding:10px 14px;border-top:1px solid var(--line);font-size:.8125rem;color:var(--muted)}
 .j-k{color:var(--cyan)}
 .j-s{color:#D6E4F5}
-.j-n{color:var(--amber)}
+.j-n{color:var(--accent)}
 .j-hot{color:var(--red);font-weight:600}
 .j-p{color:var(--muted)}
 
@@ -326,12 +355,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 @media (min-width:800px){.pv{grid-template-columns:1fr 1fr}}
 .pv>div{background:var(--ink);padding:22px 24px}
 .pv h3{display:flex;align-items:center;gap:10px}
-.pv h3 .led{color:var(--amber)}
+.pv h3 .led{color:var(--accent)}
 .pv .vis h3 .led{color:var(--cyan)}
 .pv p{margin:8px 0 0;color:var(--soft);font-size:1rem}
 .obs-grid{display:grid;gap:40px;margin-top:48px}
 .obs-grid>*{min-width:0}
 @media (min-width:1000px){.obs-grid{grid-template-columns:5fr 7fr;gap:56px}}
+.obs-grid h3 small{font:600 .75rem/1 var(--mono);color:var(--muted);letter-spacing:.04em;margin-left:6px}
 .svc{list-style:none;margin:16px 0 32px;padding:0}
 .svc li{padding:14px 0;border-top:1px solid var(--line);color:var(--soft);font-size:1rem}
 .svc b{color:var(--text);margin-right:6px}
@@ -342,21 +372,35 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .models td:first-child code{color:var(--text)}
 .models td code{font-size:.8125rem;overflow-wrap:anywhere}
 .models td:last-child code{color:var(--muted)}
+.models.mx td{color:var(--soft);font-size:.875rem}
+.models.mx td:first-child code{color:var(--cyan);font-size:.75rem}
+.models.mx td:nth-child(2) code{color:var(--muted);font-size:.75rem}
 .dash{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}
 @media (min-width:560px){.dash{grid-template-columns:1fr 1fr}}
 .dash li{background:var(--panel);border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:8px;padding:14px 16px;min-width:0}
+.dash.cb li{border-top-color:var(--accent)}
 .dash b{display:block;font-weight:700;font-size:.9375rem}
 .dash span{display:block;color:var(--soft);font-size:.875rem;margin:4px 0 8px}
 .dash code{display:block;color:var(--cyan);font-size:.6875rem;overflow-wrap:anywhere;line-height:1.5}
 .obs .note{margin-top:20px}
 
 /* ---------- quality ---------- */
-.qa{list-style:none;margin:32px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.qa{list-style:none;margin:32px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .qa li{background:var(--ink);padding:20px;display:grid;gap:6px;align-content:start;min-width:0}
+@media (min-width:720px){.qa{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:420px){.qa li{padding:16px 14px}.qa .v{font-size:1.25rem}}
 .qa .v{font:600 1.5rem/1.1 var(--mono);color:var(--text);display:flex;align-items:center;gap:10px}
 .qa .v .led{color:var(--green)}
 .qa .l{color:var(--soft);font-size:.9375rem;line-height:1.4}
 .qa code{color:var(--muted);font-size:.6875rem;overflow-wrap:anywhere}
+.cats{list-style:none;margin:0;padding:0;display:grid;gap:12px;max-width:820px}
+.cats li{display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) 6ch;gap:14px;align-items:center;font-size:.9375rem;color:var(--soft)}
+.cats small{color:var(--muted);font-size:.8125rem}
+.cats .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.cats .bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.cats b{font:600 .875rem/1 var(--mono);color:var(--text);text-align:right}
+@media (max-width:560px){.cats li{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}.cats .bar{grid-column:1/-1;grid-row:2}}
+.q-note{margin-top:20px}
 
 /* ---------- quick start ---------- */
 .tabs{margin-top:36px}
@@ -364,9 +408,9 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .js .tablist{display:flex}
 .tab{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 16px;font-weight:700;font-size:1rem;color:var(--muted);cursor:pointer;white-space:nowrap}
 .tab:hover{color:var(--text)}
-.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--amber)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
 .tabpanel{padding-top:28px}
-@media (max-width:559px){.js .tablist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.tab{white-space:normal;padding:10px 6px;font-size:.875rem;line-height:1.25;text-align:center}}
+@media (max-width:639px){.js .tablist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tab{white-space:normal;padding:10px 6px;font-size:.875rem;line-height:1.25;text-align:center}}
 .tabpanel>h3{margin-bottom:10px}
 .js .tabpanel>h3.pl{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tabpanel p{color:var(--soft);max-width:70ch}
@@ -376,22 +420,29 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .code{background:var(--ink);border:1px solid var(--line-2);border-radius:10px;overflow:hidden;margin:16px 0 20px}
 .code-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 6px 6px 14px;border-bottom:1px solid var(--line);background:var(--panel);font:600 .75rem/1 var(--mono);color:var(--muted);letter-spacing:.04em}
 .copy{display:inline-flex;align-items:center;gap:6px;background:var(--ink);border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;min-height:34px;font:600 .75rem/1 var(--mono);color:var(--text);cursor:pointer}
-.copy:hover{border-color:var(--amber)}
+.copy:hover{border-color:var(--accent)}
 .copy svg{width:14px;height:14px}
 .copy[data-state="copied"]{color:var(--green);border-color:var(--green)}
 .copy[data-state="failed"]{color:var(--red);border-color:var(--red)}
-.code pre{margin:0;padding:14px 16px;overflow-x:auto;font-size:.8125rem;line-height:1.65;color:var(--text)}
+.code pre{margin:0;padding:14px 16px;overflow-x:auto;font-size:.8125rem;line-height:1.65;color:var(--text);tab-size:4}
 .code .c{color:var(--muted)}
+.callout{border:1px solid var(--line-2);border-left:3px solid var(--cyan);border-radius:8px;padding:14px 16px;margin:20px 0;background:var(--deep);color:var(--soft);font-size:.9375rem;max-width:80ch}
+.callout p{margin:0}
+.callout b{color:var(--text)}
+.callout code{color:var(--text)}
+.callout .code{margin:12px 0 0}
 
 /* ---------- config ---------- */
 .cfg{width:100%;border-collapse:collapse;margin-top:32px;font-size:.9375rem}
 .cfg th,.cfg td{text-align:left;padding:14px 16px 14px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .cfg th{font:600 .6875rem/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom-color:var(--line-2)}
 .cfg td code{font-size:.8125rem}
-.cfg td:first-child code{color:var(--amber)}
-.cfg td:nth-child(2) code{color:var(--muted)}
+.cfg td:first-child code{color:var(--accent)}
+.cfg td:first-child .na{color:var(--muted);font-size:.8125rem}
+.cfg td:nth-child(2) code{color:var(--cyan)}
 .cfg td:nth-child(3) code{color:var(--text)}
 .cfg td:last-child{color:var(--soft)}
+.cfg td:last-child code{color:var(--text)}
 @media (max-width:759px){
   .cfg thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .cfg,.cfg tbody,.cfg tr,.cfg td{display:block;width:100%}
@@ -401,6 +452,21 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 }
 .more{margin-top:20px;font-weight:600}
 
+/* ---------- team ---------- */
+.team{border-top:1px solid var(--line);padding-block:clamp(48px,6vw,72px)}
+.team-grid{display:grid;gap:28px;align-items:center}
+.team-grid>*{min-width:0}
+@media (min-width:880px){.team-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px}}
+.team-id{display:flex;gap:16px;align-items:center}
+.team-id img{width:56px;height:56px;flex:none}
+.team h2{font-size:clamp(1.5rem,1.2rem + 1vw,2rem);max-width:none}
+.team-id p{margin:6px 0 0;color:var(--soft);font-size:.9375rem}
+.crew{list-style:none;margin:0;padding:0;display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+@media (min-width:600px){.crew{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.crew li{background:var(--ink);padding:18px 20px;display:grid;gap:4px;min-width:0}
+.crew b{font-weight:700;font-size:1.0625rem}
+.crew span{font:600 .75rem/1.4 var(--mono);letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+
 /* ---------- footer ---------- */
 .foot{border-top:1px solid var(--line);padding-block:48px 56px;color:var(--muted);font-size:.9375rem}
 .foot-grid{display:grid;gap:28px}
@@ -409,7 +475,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 .foot p{margin:0}
 .foot ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 24px}
 .foot a{color:var(--soft)}
-.foot a:hover{color:var(--amber)}
+.foot a:hover{color:var(--accent)}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
@@ -426,8 +492,6 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
     <marker id="ah-c" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#60D0E4"/></marker>
     <marker id="ah-r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#FF5A67"/></marker>
     <marker id="ah-m" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8FA6C4"/></marker>
-    <mask id="snapcut"><rect width="32" height="32" fill="#fff"/><rect x="-1.7" y="-5" width="3.4" height="10" fill="#000" transform="translate(27.4 11.6) rotate(45)"/></mask>
-    <symbol id="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#112240" stroke="#2A4670"/><path d="M16 16C18.5 11 21 9.5 23 9.5C26.6 9.5 28.6 12.6 28.6 16S26.6 22.5 23 22.5C21 22.5 18.5 21 16 16S11 9.5 9 9.5C5.4 9.5 3.4 12.6 3.4 16S5.4 22.5 9 22.5C11 22.5 13.5 21 16 16Z" fill="none" stroke="#4CB2FF" stroke-width="3.2" stroke-linejoin="round" mask="url(#snapcut)"/></symbol>
     <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
     <symbol id="i-copy" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3"/></symbol>
     <symbol id="i-replay" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M2.5 8a5.5 5.5 0 1 0 1.7-4M2.5 2v3.5H6"/></symbol>
@@ -436,11 +500,12 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
 <header class="site-head">
   <nav class="wrap nav" aria-label="Primary">
-    <a class="brand" href="#top" aria-label="AI Agent Circuit Breaker, back to top"><img src="logo-64.png" alt="" width="30" height="30"><span class="bn"><span class="bn-pre">AI Agent </span>Circuit Breaker</span></a>
+    <a class="brand" href="#top" aria-label="AI Agent Circuit Breaker, back to top"><img src="logo.svg" alt="" width="30" height="30"><span class="bn"><span class="bn-pre">AI Agent </span>Circuit Breaker</span></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="#how">How it works</a></li>
-      <li><a href="#detectors">Detectors</a></li>
+      <li><a href="#detectors">Breakers</a></li>
+      <li><a href="#extend">Plugins</a></li>
       <li><a href="#observability">Observability</a></li>
       <li><a href="#quickstart">Quick start</a></li>
     </ul>
@@ -456,7 +521,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
     <div class="hero-top">
       <h1 id="hero-title">Stop runaway AI agents before they burn your budget.</h1>
       <div>
-        <p class="hero-sub">The circuit breaker for AI agents, by Team MarsadOps: a Go reverse proxy that sits between your agents and any OpenAI-compatible API, stops runaway agents mid-stream, and comes with an observability stack for latency, spend and errors.</p>
+        <p class="hero-sub">The circuit breaker for AI agents, by Team MarsadOps: a Go reverse proxy with pluggable breakers that sits between your agents and any OpenAI-compatible API. It stops tool-call loops, failing tools, request floods and degenerate streams, and exports every decision to Prometheus and Grafana.</p>
         <div class="cta">
           <a class="btn btn-primary" href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker"><svg aria-hidden="true"><use href="#gh"/></svg>View on GitHub</a>
           <a class="btn btn-ghost" href="#quickstart">Quick start</a>
@@ -466,7 +531,7 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 
     <figure class="inst" id="inst" data-state="tripped" aria-labelledby="inst-cap">
       <div class="inst-head">
-        <span class="inst-name"><b>circuit breaker proxy</b> <span class="nw">:8080 &rarr; litellm :4000</span></span>
+        <span class="inst-name"><b>circuit breaker proxy :8080</b> <span class="nw">6 plugins</span></span>
         <span class="state"><span class="led" aria-hidden="true"></span><span class="sr-only">Circuit state: </span><span data-ro="state">OPEN_TRIPPED</span></span>
       </div>
       <div class="scope" aria-hidden="true">
@@ -481,39 +546,38 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
       <div class="inst-body">
         <div class="term" tabindex="0" role="log" aria-live="off" aria-label="Proxy terminal replay">
           <ol id="term-lines">
-            <li data-w="200"><span class="t-p">$</span> ./proxy-server -port 8080 -target http://localhost:4000</li>
-            <li class="t-dim" data-w="500">  &bull; CB Tool Loop Limit : 3 identical/similar calls</li>
-            <li class="t-dim" data-w="220">  &bull; CB Jaccard Thresh  : 0.85 similarity index</li>
-            <li class="t-com t-gap" data-w="700"># agent loop: model qwen3.6-27b, tool web_search, non-streaming</li>
-            <li class="t-chk" data-w="800" data-c="0">&#9656; history: no tool calls yet &rarr; forward</li>
-            <li data-w="650">POST /v1/chat/completions  <span class="t-ok">200 OK</span>  [qwen3.6-27b | 1 msgs]</li>
-            <li data-w="380">  &#8627; Tool Call: web_search(args: <span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 0)"}</span>)</li>
-            <li class="t-chk t-gap" data-w="1000" data-c="1" data-e="4.56">&#9656; history: 1 web_search call, similar 1/3 &rarr; forward</li>
-            <li data-w="650">POST /v1/chat/completions  <span class="t-ok">200 OK</span>  [qwen3.6-27b | 3 msgs]</li>
-            <li data-w="380">  &#8627; Tool Call: web_search(args: <span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 1)"}</span>)</li>
-            <li class="t-chk t-gap" data-w="1100" data-c="2" data-j="0.887" data-h="1 bit">&#9656; history: attempt 1 vs 0: jaccard 0.887 &ge; 0.85, simhash &Delta;1 &rarr; similar 2/3 &rarr; forward</li>
-            <li data-w="650">POST /v1/chat/completions  <span class="t-ok">200 OK</span>  [qwen3.6-27b | 5 msgs]</li>
-            <li data-w="380">  &#8627; Tool Call: web_search(args: <span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 2)"}</span>)</li>
-            <li class="t-chk t-gap" data-w="1200" data-c="3" data-j="0.887" data-h="&le; 1 bit" data-trip="1">&#9656; history: attempt 2 vs 0 and 1: jaccard 0.887, simhash &Delta;0 / &Delta;1 &rarr; similar 3/3 &rarr; TRIP</li>
-            <li data-w="500">POST /v1/chat/completions  <span class="t-bad">429 Too Many Requests</span>  [Retry-After: 10]</li>
-            <li class="json-hl" data-w="450">{"sre_incident":{"incident_id":"inc_20260925_195529_0e95671b","circuit_state":"OPEN_TRIPPED","failure_class":"TOOL_CALL_REPETITION_LOOP","tool_name":"web_search","simhash":"0x9889dd5823a517a5","observed_count":3,"threshold":3,"mitigation":"Request rejected at edge - repetitive tool call loop detected via SimHash / Jaccard similarity"}}</li>
+            <li data-w="200"><span class="t-p">$</span> ./circuit-breaker</li>
+            <li class="t-dim" data-w="500">  Active measures: SimHashLoopBreaker, JaccardSimilarity, VelocityDetector, ErrorAccumulation, StreamEntropy, DeclarativePolicy</li>
+            <li class="t-com t-gap" data-w="700"># agent on qwen3.6-27b, fixing a CrashLoopBackOff with web_search</li>
+            <li data-w="650">  &#8627; Tool Call: web_search(<span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 0)"}</span>)</li>
+            <li class="t-chk" data-w="800" data-c="1" data-r="pending">&#9656; call 1: first web_search in this session &rarr; allow</li>
+            <li data-w="450">[11:48:42] POST /v1/chat/completions  <span class="t-ok">200</span> (3ms)</li>
+            <li class="t-com" data-w="600"># agent runs the tool: {"results":[],"total":0}</li>
+            <li class="t-gap" data-w="650">  &#8627; Tool Call: web_search(<span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 1)"}</span>)</li>
+            <li class="t-chk" data-w="1100" data-c="2" data-j="0.887" data-h="4 bits" data-r="unchanged">&#9656; call 2 vs 1: jaccard 0.887 &ge; 0.8 (simhash 4 bits apart, needs &le; 3), same result &rarr; repeat 2/3 &rarr; allow</li>
+            <li data-w="450">[11:48:42] POST /v1/chat/completions  <span class="t-ok">200</span> (1ms)</li>
+            <li class="t-com" data-w="600"># agent runs the tool: {"results":[],"total":0}</li>
+            <li class="t-gap" data-w="650">  &#8627; Tool Call: web_search(<span class="t-args">{"query":"kubernetes pod crashloop fix (attempt 2)"}</span>)</li>
+            <li class="t-chk" data-w="1200" data-c="3" data-j="0.887" data-h="6 bits" data-r="unchanged" data-trip="1">&#9656; call 3 vs 1&ndash;2: jaccard 0.887, same result &rarr; repeat 3/3 &rarr; BLOCK (JaccardSimilarity)</li>
+            <li data-w="450">[11:48:42] POST /v1/chat/completions  <span class="t-bad">403</span> (1ms)</li>
+            <li class="json-hl" data-w="450">{"error":{"message":"Circuit breaker tripped (TOOL_CALL_REPETITION_LOOP): Blocked call 3 to web_search: similar calls keep returning the same result. Action required: Change approach instead of repeating the call; review agent prompt or tool logic","type":"circuit_breaker","code":"tool_call_repetition_loop"},"sre_incident":{"incident_id":"inc_20260926_114842_459832ad","timestamp":"2026-09-26T11:48:42.985597+03:00","circuit_state":"OPEN_TRIPPED","failure_class":"TOOL_CALL_REPETITION_LOOP","tool_name":"web_search","mitigation":"Blocked call 3 to web_search: similar calls keep returning the same result","action_required":"Change approach instead of repeating the call; review agent prompt or tool logic","details":{"observed_count":3,"similarity":0.8867924528301887,"threshold":3,"tool_name":"web_search"}}}</li>
           </ol>
         </div>
         <div class="gauge-col">
           <div class="bk-plate">
             <span class="lever" aria-hidden="true"><span class="on">ON</span><span class="handle"></span><span class="off">OFF</span></span>
-            <span class="bk-plate-txt">CB-01<b>Tool-call loop</b></span>
+            <span class="bk-plate-txt">CB-01&middot;02<b>Tool-call loop</b></span>
           </div>
           <dl class="ro">
-            <div><dt>Similar calls</dt><dd><span data-ro="c">3</span><small>/ 3</small><span class="segs" aria-hidden="true"><i class="lit"></i><i class="lit"></i><i class="lit"></i></span></dd></div>
-            <div><dt>Jaccard, 3-gram</dt><dd><span data-ro="j">0.887</span><small>trips &ge; 0.85</small></dd></div>
-            <div><dt>SimHash distance</dt><dd><span data-ro="h">&le; 1 bit</span></dd></div>
-            <div><dt>Args entropy</dt><dd><span data-ro="e">4.56</span><small>bits/byte</small></dd></div>
+            <div><dt>Repeats</dt><dd><span data-ro="c">3</span><small>/ 3</small><span class="segs" aria-hidden="true"><i class="lit"></i><i class="lit"></i><i class="lit"></i></span></dd></div>
+            <div><dt>Jaccard, 3-gram</dt><dd><span data-ro="j">0.887</span><small>match &ge; 0.8</small></dd></div>
+            <div><dt>SimHash distance</dt><dd><span data-ro="h">6 bits</span><small>match &le; 3</small></dd></div>
+            <div><dt>Tool result</dt><dd><span data-ro="r">unchanged</span></dd></div>
           </dl>
         </div>
       </div>
       <figcaption class="inst-foot">
-        <p id="inst-cap">Annotated replay: an agent retries the same search with a new attempt number each time. The &#9656; lines explain each history check. Similarity values, SimHash and the 429 body are the proxy&rsquo;s real output for these arguments.</p>
+        <p id="inst-cap">Annotated replay of a real run: the proxy with its six default plugins, in front of a scripted model that keeps asking for the same search with a new attempt number, and a tool that keeps returning the same empty result. The &#9656; lines explain the loop check. The similarity, the SimHash distances and the 403 body are the proxy&rsquo;s real output for these calls.</p>
         <button class="btn-replay no-js-hide" type="button" id="replay"><svg aria-hidden="true"><use href="#i-replay"/></svg>Replay</button>
       </figcaption>
     </figure>
@@ -529,16 +593,17 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         <p class="lede">Autonomous agents fail by repeating themselves. Every request looks valid on its own, so nothing errors and nothing alerts, while the tokens keep flowing until someone reads the bill.</p>
       </div>
       <ul class="fails">
-        <li><span class="tag"><a href="#cb-01">CB-01</a></span><h3>Tool loops with mutated arguments</h3><p>The agent runs the same search again with &ldquo;(attempt 1)&rdquo;, then &ldquo;(attempt 2)&rdquo;. Each call is slightly different, so each one looks like new work.</p></li>
-        <li><span class="tag"><a href="#cb-02">CB-02</a></span><h3>Retry and error storms</h3><p>A tool keeps failing and the agent keeps calling it, feeding each failure back into the next attempt.</p></li>
-        <li><span class="tag"><a href="#cb-03">CB-03</a></span><h3>Degenerate output</h3><p>The model collapses into repetitive, low-information text such as &ldquo;! ! ! !&rdquo; and keeps generating it.</p></li>
-        <li><span class="tag"><a href="#cb-04">CB-04</a></span><h3>Endpoint hammering</h3><p>A tight loop fires requests at one endpoint far faster than any person would.</p></li>
-        <li><span class="tag"><a href="#cb-05">CB-05</a></span><h3>Silent token burn</h3><p>None of the above raises an error, so spend climbs quietly in the background.</p></li>
+        <li><span class="tag"><a href="#cb-01">CB-01</a></span><h3>Tool loops with mutated arguments</h3><p>The agent runs the same search again with &ldquo;(attempt 1)&rdquo;, then &ldquo;(attempt 2)&rdquo;, and gets the same answer each time. Every call is slightly different, so each one looks like new work.</p></li>
+        <li><span class="tag"><a href="#cb-03">CB-03</a></span><h3>Error storms</h3><p>A tool keeps failing and the agent keeps calling it, feeding each failure back into the next attempt.</p></li>
+        <li><span class="tag"><a href="#cb-04">CB-04</a></span><h3>Request floods</h3><p>A tight loop fires requests far faster than any person would.</p></li>
+        <li><span class="tag"><a href="#cb-05">CB-05</a></span><h3>Degenerate output</h3><p>The model collapses into repetitive text such as &ldquo;! ! ! !&rdquo; or the same apology, and keeps streaming it.</p></li>
+        <li><span class="tag"><a href="#cb-06">CB-06</a></span><h3>Injected instructions</h3><p>A web page or tool result tells the agent to &ldquo;ignore all previous instructions&rdquo;.</p></li>
+        <li><span class="tag"><a href="#observability">OBS</a></span><h3>Silent token burn</h3><p>None of the above raises an error on its own, so spend climbs quietly in the background.</p></li>
       </ul>
     </div>
 
     <div class="miss">
-      <h3>Why rate limiters and exact-hash dedupe miss it</h3>
+      <h3>Why rate limiters and exact-hash dedupe miss loops</h3>
       <div class="compare">
         <div>
           <h4>Rate limiter</h4>
@@ -554,10 +619,10 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         </div>
         <div class="us">
           <h4>AI Agent Circuit Breaker</h4>
-          <p>Compares what the agent is doing. The same two calls share most of their character 3-grams, so they count as one repeated action.</p>
+          <p>Compares what the agent is doing. After masking counters, timestamps and IDs, the two calls share most of their character 3-grams. If the tool also keeps returning the same result, they count as one repeated action.</p>
           <ul class="hashes">
-            <li>jaccard(attempt 0, attempt 1)<br><span class="good">0.887 &ge; 0.85 &rarr; same call</span></li>
-            <li>plus tool errors, text entropy<br>and per-session velocity</li>
+            <li>jaccard(attempt 0, attempt 1)<br><span class="good">0.887 &ge; 0.8 &rarr; same call</span></li>
+            <li>simhash: 4 bits apart<br>needs &le; 3, so this test alone would miss it</li>
           </ul>
         </div>
       </div>
@@ -569,12 +634,12 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band" id="how" aria-labelledby="how-title">
   <div class="wrap">
     <h2 id="how-title">One proxy between your agents and the model API</h2>
-    <p class="lede">Point your agent&rsquo;s base URL at the breaker proxy instead of the model API. It forwards every path and query unchanged to the LiteLLM gateway, which routes each request to Groq, Gemini or Ollama. LiteLLM&rsquo;s metrics flow into Prometheus and Grafana.</p>
+    <p class="lede">Point your agent&rsquo;s base URL at the breaker. The proxy is a small Go kernel: it parses each request, runs it through a pipeline of plugins and enforces what they decide. Everything else goes through unchanged to any OpenAI-compatible upstream, here the LiteLLM gateway, which routes to Groq, Gemini or Ollama. The proxy exports its own metrics; LiteLLM exports its own.</p>
 
     <figure class="diagram" style="margin-inline:0">
-      <svg class="wide" viewBox="0 0 1120 400" role="img" aria-labelledby="dw-t dw-d">
+      <svg class="wide" viewBox="0 0 1120 490" role="img" aria-labelledby="dw-t dw-d">
         <title id="dw-t">AI Agent Circuit Breaker architecture</title>
-        <desc id="dw-d">An AI agent sends requests to the circuit breaker proxy on port 8080. The proxy forwards them to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. When a breaker trips, the proxy answers the agent with HTTP 429 and an incident. The proxy writes terminal alerts and conversation audit files. LiteLLM exposes metrics that Prometheus on port 9090 scrapes and Grafana on port 3000 displays.</desc>
+        <desc id="dw-d">An AI agent sends requests to the circuit breaker proxy on port 8080, which runs six plugins. The proxy forwards allowed requests to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. When a breaker trips, the proxy answers the agent with HTTP 403, HTTP 429, or an error event that ends the stream. The proxy writes an audit log and posts incidents to webhooks. Its own /metrics endpoint is scraped by Prometheus on port 9090 and shown in Grafana on port 3001. Separately, LiteLLM's metrics are scraped by the LiteLLM stack's Prometheus on port 9090 and shown in Grafana on port 3000.</desc>
         <!-- agent -->
         <rect class="d-box" x="10" y="62" width="190" height="96" rx="8"/>
         <text class="d-t" x="28" y="98">AI agent / app</text>
@@ -584,17 +649,19 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         <path class="d-ln d-la" d="M202 96H290" marker-end="url(#ah-a)"/>
         <text class="d-ma" x="214" y="86">request</text>
         <path class="d-ln d-lr" d="M290 128H204" marker-end="url(#ah-r)"/>
-        <text class="d-mr" x="226" y="150">429</text>
+        <text class="d-mr" x="214" y="150">403 / 429</text>
+        <text class="d-mr" x="214" y="166">stream cut</text>
         <!-- proxy -->
         <rect class="d-hot" x="300" y="34" width="280" height="156" rx="10"/>
         <text class="d-t" x="320" y="68">Circuit breaker proxy</text>
-        <text class="d-m" x="320" y="90">:8080  Go reverse proxy</text>
+        <text class="d-m" x="320" y="90">:8080  Go kernel + plugins</text>
         <g transform="translate(320 110)">
-          <rect class="mini-b" x="0" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="18" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="12" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="22" y="54" text-anchor="middle">01</text>
-          <rect class="mini-b" x="52" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="70" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="64" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="74" y="54" text-anchor="middle">02</text>
-          <rect class="mini-b" x="104" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="122" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="116" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="126" y="54" text-anchor="middle">03</text>
-          <rect class="mini-b" x="156" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="174" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="168" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="178" y="54" text-anchor="middle">04</text>
-          <rect class="mini-b" x="208" y="0" width="44" height="62" rx="4"/><rect class="mini-s" x="226" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="220" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="230" y="54" text-anchor="middle">05</text>
+          <rect class="mini-b" x="0" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="14" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="8" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="18" y="54" text-anchor="middle">01</text>
+          <rect class="mini-b" x="42" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="56" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="50" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="60" y="54" text-anchor="middle">02</text>
+          <rect class="mini-b" x="84" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="98" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="92" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="102" y="54" text-anchor="middle">03</text>
+          <rect class="mini-b" x="126" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="140" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="134" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="144" y="54" text-anchor="middle">04</text>
+          <rect class="mini-b" x="168" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="182" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="176" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="186" y="54" text-anchor="middle">05</text>
+          <rect class="mini-b" x="210" y="0" width="36" height="62" rx="4"/><rect class="mini-s" x="224" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="218" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="228" y="54" text-anchor="middle">06</text>
         </g>
         <!-- proxy -> litellm -->
         <path class="d-ln d-la" d="M582 112H652" marker-end="url(#ah-a)"/>
@@ -614,85 +681,103 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         <text class="d-ts" x="956" y="110">Google Gemini</text><text class="d-m" x="956" y="130">gemini-3.6-flash</text>
         <rect class="d-box" x="940" y="148" width="170" height="60" rx="8"/>
         <text class="d-ts" x="956" y="174">Ollama</text><text class="d-m" x="956" y="194">gemma4</text>
-        <!-- proxy -> audit -->
-        <path class="d-ln d-lm" d="M440 192V282" marker-end="url(#ah-m)"/>
-        <rect class="d-box" x="300" y="290" width="280" height="96" rx="8" style="stroke-dasharray:5 4"/>
-        <text class="d-ts" x="320" y="322">Terminal alerts + audit log</text>
-        <text class="d-m" x="320" y="346">conversations/*.json</text>
-        <text class="d-m" x="320" y="366">sliding-window dashboard</text>
-        <!-- litellm -> prometheus -> grafana -->
-        <path class="d-ln d-lc" d="M760 162V282" marker-end="url(#ah-c)"/>
-        <text class="d-mc" x="772" y="226">/metrics</text>
-        <rect class="d-box d-cy" x="660" y="290" width="200" height="96" rx="8"/>
-        <text class="d-t" x="678" y="324">Prometheus</text>
-        <text class="d-m" x="678" y="348">:9090</text>
-        <text class="d-m" x="678" y="368">scrapes every 5 s</text>
-        <path class="d-ln d-lc" d="M862 338H932" marker-end="url(#ah-c)"/>
-        <rect class="d-box d-cy" x="940" y="290" width="170" height="96" rx="8"/>
-        <text class="d-t" x="956" y="324">Grafana</text>
-        <text class="d-m" x="956" y="348">:3000</text>
-        <text class="d-m" x="956" y="368">LiteLLM dashboard</text>
+        <!-- proxy -> audit + webhooks -->
+        <path class="d-ln d-lm" d="M330 192V230H105V262" marker-end="url(#ah-m)"/>
+        <rect class="d-box" x="10" y="270" width="200" height="96" rx="8" style="stroke-dasharray:5 4"/>
+        <text class="d-ts" x="28" y="302">Audit + webhooks</text>
+        <text class="d-m" x="28" y="326">conversations/*.json</text>
+        <text class="d-m" x="28" y="346">incident JSON to URLs</text>
+        <!-- proxy /metrics -> prometheus -> grafana :3001 -->
+        <path class="d-ln d-lc" d="M470 192V262" marker-end="url(#ah-c)"/>
+        <text class="d-mc" x="482" y="234">/metrics</text>
+        <rect class="d-box d-cy" x="340" y="270" width="240" height="84" rx="8"/>
+        <text class="d-t" x="358" y="302">Prometheus</text>
+        <text class="d-m" x="358" y="326">:9090  breaker metrics</text>
+        <path class="d-ln d-lc" d="M460 356V392" marker-end="url(#ah-c)"/>
+        <rect class="d-box d-cy" x="340" y="400" width="240" height="84" rx="8"/>
+        <text class="d-t" x="358" y="432">Grafana</text>
+        <text class="d-m" x="358" y="456">:3001  51-panel dashboard</text>
+        <!-- litellm -> prometheus -> grafana :3000 -->
+        <path class="d-ln d-lc" d="M760 162V262" marker-end="url(#ah-c)"/>
+        <text class="d-mc" x="772" y="234">/metrics</text>
+        <rect class="d-box d-cy" x="660" y="270" width="200" height="84" rx="8"/>
+        <text class="d-t" x="678" y="302">Prometheus</text>
+        <text class="d-m" x="678" y="326">:9090  LiteLLM</text>
+        <path class="d-ln d-lc" d="M760 356V392" marker-end="url(#ah-c)"/>
+        <rect class="d-box d-cy" x="660" y="400" width="200" height="84" rx="8"/>
+        <text class="d-t" x="678" y="432">Grafana</text>
+        <text class="d-m" x="678" y="456">:3000  LiteLLM dashboard</text>
         <!-- legend -->
-        <g transform="translate(10 300)">
+        <g transform="translate(10 396)">
           <path class="d-ln d-la" d="M0 8H34"/><text class="d-m" x="44" y="12">request path</text>
-          <path class="d-ln d-lr" d="M0 36H34"/><text class="d-m" x="44" y="40">trip: 429 + incident</text>
+          <path class="d-ln d-lr" d="M0 36H34"/><text class="d-m" x="44" y="40">trip + incident</text>
           <path class="d-ln d-lc" d="M0 64H34"/><text class="d-m" x="44" y="68">metrics</text>
+        </g>
+        <g transform="translate(940 270)">
+          <text class="d-m" x="0" y="14">Two separate stacks:</text>
+          <text class="d-m" x="0" y="34">breaker monitoring/</text>
+          <text class="d-m" x="0" y="54">and AI-Monitoring.</text>
+          <text class="d-m" x="0" y="74">Both use :9090, so</text>
+          <text class="d-m" x="0" y="94">run one at a time.</text>
         </g>
       </svg>
 
-      <svg class="tall" viewBox="0 0 360 600" role="img" aria-labelledby="dt-t dt-d">
+      <svg class="tall" viewBox="0 0 360 620" role="img" aria-labelledby="dt-t dt-d">
         <title id="dt-t">AI Agent Circuit Breaker architecture</title>
-        <desc id="dt-d">An AI agent sends requests to the circuit breaker proxy on port 8080, which answers with HTTP 429 and an incident when a breaker trips. The proxy forwards to the LiteLLM gateway on port 4000, which routes to Groq, Google Gemini or Ollama. LiteLLM metrics go to Prometheus on port 9090 and then to Grafana on port 3000.</desc>
+        <desc id="dt-d">An AI agent sends requests to the circuit breaker proxy on port 8080, which runs six plugins and answers with HTTP 403, HTTP 429 or a stream error event when a breaker trips. The proxy forwards to the LiteLLM gateway on port 4000, which routes to Groq, Gemini or Ollama. The proxy's metrics go to Prometheus on port 9090 and Grafana on port 3001; LiteLLM's metrics go to its own Prometheus on port 9090 and Grafana on port 3000.</desc>
         <rect class="d-box" x="60" y="6" width="240" height="64" rx="8"/>
         <text class="d-t" x="180" y="34" text-anchor="middle">AI agent / app</text>
         <text class="d-m" x="180" y="55" text-anchor="middle">base_url :8080/v1</text>
         <path class="d-ln d-la" d="M150 72V110" marker-end="url(#ah-a)"/>
         <path class="d-ln d-lr" d="M210 110V74" marker-end="url(#ah-r)"/>
-        <text class="d-mr" x="220" y="98">429</text>
+        <text class="d-mr" x="220" y="98">403 / 429</text>
         <rect class="d-hot" x="20" y="118" width="320" height="142" rx="10"/>
         <text class="d-t" x="180" y="148" text-anchor="middle">Circuit breaker proxy</text>
-        <text class="d-m" x="180" y="168" text-anchor="middle">:8080  alerts + audit JSON</text>
+        <text class="d-m" x="180" y="168" text-anchor="middle">:8080  audit + webhooks</text>
         <g transform="translate(40 184)">
-          <rect class="mini-b" x="0" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="20" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="14" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="24" y="54" text-anchor="middle">01</text>
-          <rect class="mini-b" x="58" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="78" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="72" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="82" y="54" text-anchor="middle">02</text>
-          <rect class="mini-b" x="116" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="136" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="130" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="140" y="54" text-anchor="middle">03</text>
-          <rect class="mini-b" x="174" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="194" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="188" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="198" y="54" text-anchor="middle">04</text>
-          <rect class="mini-b" x="232" y="0" width="48" height="62" rx="4"/><rect class="mini-s" x="252" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="246" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="256" y="54" text-anchor="middle">05</text>
+          <rect class="mini-b" x="0" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="16" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="10" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="20" y="54" text-anchor="middle">01</text>
+          <rect class="mini-b" x="48" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="64" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="58" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="68" y="54" text-anchor="middle">02</text>
+          <rect class="mini-b" x="96" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="112" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="106" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="116" y="54" text-anchor="middle">03</text>
+          <rect class="mini-b" x="144" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="160" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="154" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="164" y="54" text-anchor="middle">04</text>
+          <rect class="mini-b" x="192" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="208" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="202" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="212" y="54" text-anchor="middle">05</text>
+          <rect class="mini-b" x="240" y="0" width="40" height="62" rx="4"/><rect class="mini-s" x="256" y="8" width="8" height="30" rx="4"/><rect class="mini-h" x="250" y="8" width="20" height="14" rx="2"/><text class="mini-l" x="260" y="54" text-anchor="middle">06</text>
         </g>
-        <path class="d-ln d-la" d="M180 262V300" marker-end="url(#ah-a)"/>
-        <rect class="d-box" x="60" y="308" width="240" height="64" rx="8"/>
-        <text class="d-t" x="180" y="336" text-anchor="middle">LiteLLM gateway</text>
-        <text class="d-m" x="180" y="357" text-anchor="middle">:4000</text>
-        <path class="d-ln d-la" d="M100 374V412" marker-end="url(#ah-a)"/>
-        <path class="d-ln d-lc" d="M260 374V412" marker-end="url(#ah-c)"/>
-        <text class="d-mc" x="268" y="398">/metrics</text>
-        <rect class="d-dash" x="6" y="420" width="168" height="174" rx="10"/>
-        <rect class="d-box" x="14" y="428" width="152" height="50" rx="7"/>
-        <text class="d-ts" x="26" y="449">Groq</text><text class="d-m" x="26" y="468">qwen3.6-27b</text>
-        <rect class="d-box" x="14" y="484" width="152" height="50" rx="7"/>
-        <text class="d-ts" x="26" y="505">Google Gemini</text><text class="d-m" x="26" y="524">gemini-3.6-flash</text>
-        <rect class="d-box" x="14" y="540" width="152" height="50" rx="7"/>
-        <text class="d-ts" x="26" y="561">Ollama</text><text class="d-m" x="26" y="580">gemma4</text>
-        <rect class="d-box d-cy" x="190" y="420" width="164" height="64" rx="8"/>
-        <text class="d-ts" x="204" y="446">Prometheus</text>
-        <text class="d-m" x="204" y="467">:9090, every 5 s</text>
-        <path class="d-ln d-lc" d="M272 486V522" marker-end="url(#ah-c)"/>
-        <rect class="d-box d-cy" x="190" y="530" width="164" height="64" rx="8"/>
-        <text class="d-ts" x="204" y="556">Grafana</text>
-        <text class="d-m" x="204" y="577">:3000</text>
+        <path class="d-ln d-la" d="M94 262V300" marker-end="url(#ah-a)"/>
+        <path class="d-ln d-lc" d="M266 262V300" marker-end="url(#ah-c)"/>
+        <text class="d-mc" x="198" y="286">/metrics</text>
+        <rect class="d-box" x="14" y="308" width="160" height="80" rx="8"/>
+        <text class="d-ts" x="94" y="334" text-anchor="middle">LiteLLM gateway</text>
+        <text class="d-m" x="94" y="354" text-anchor="middle">:4000</text>
+        <text class="d-m" x="94" y="374" text-anchor="middle">Groq/Gemini/Ollama</text>
+        <rect class="d-box d-cy" x="186" y="308" width="160" height="64" rx="8"/>
+        <text class="d-ts" x="266" y="334" text-anchor="middle">Prometheus</text>
+        <text class="d-m" x="266" y="355" text-anchor="middle">:9090 breaker</text>
+        <path class="d-ln d-lc" d="M266 374V410" marker-end="url(#ah-c)"/>
+        <rect class="d-box d-cy" x="186" y="418" width="160" height="64" rx="8"/>
+        <text class="d-ts" x="266" y="444" text-anchor="middle">Grafana</text>
+        <text class="d-m" x="266" y="465" text-anchor="middle">:3001, 51 panels</text>
+        <path class="d-ln d-lc" d="M94 390V426" marker-end="url(#ah-c)"/>
+        <text class="d-mc" x="102" y="414">/metrics</text>
+        <rect class="d-box d-cy" x="14" y="434" width="160" height="64" rx="8"/>
+        <text class="d-ts" x="94" y="460" text-anchor="middle">Prometheus</text>
+        <text class="d-m" x="94" y="481" text-anchor="middle">:9090 LiteLLM</text>
+        <path class="d-ln d-lc" d="M94 500V536" marker-end="url(#ah-c)"/>
+        <rect class="d-box d-cy" x="14" y="544" width="160" height="64" rx="8"/>
+        <text class="d-ts" x="94" y="570" text-anchor="middle">Grafana</text>
+        <text class="d-m" x="94" y="591" text-anchor="middle">:3000 LiteLLM</text>
       </svg>
     </figure>
 
-    <h3 class="life-h">What happens to every request</h3>
+    <h3 class="sub-h">What happens to every request</h3>
     <ol class="life">
-      <li><div><b>Identify the session</b><span>From the <code>X-Session-ID</code> header, else the <code>Authorization</code> header, else the client IP.</span></div></li>
-      <li><div><b>Check velocity first</b><span>Before the body is even read. Too many requests per second, or too many hits on one endpoint, returns <code>429</code> with <code>VELOCITY_BLOCKED</code>.</span></div></li>
-      <li><div><b>Parse the OpenAI body</b><span>Model, messages and tool calls are read, and the body is restored untouched for forwarding.</span></div></li>
-      <li><div><b>Scan the conversation history</b><span>Looping tool calls, piled-up tool errors and low-entropy text return <code>429</code> with <code>OPEN_TRIPPED</code> before the model is called.</span></div></li>
-      <li><div><b>Record the sliding window</b><span>Requests, estimated tokens and models over the last 60 seconds. With <code>-enforce-limits</code>, an over-budget request gets <code>429</code>.</span></div></li>
-      <li><div><b>Forward upstream</b><span>Path and query intact, <code>X-Forwarded-For</code> added. If the upstream is down, the agent gets a JSON <code>502</code>.</span></div></li>
-      <li><div><b>Inspect the response as it arrives</b><span>Every byte feeds the entropy engine and streamed tool-call fragments are reassembled. A trip closes the upstream stream and appends the incident.</span></div></li>
-      <li><div><b>Write the audit trail</b><span>Each turn is saved to a conversation JSON file, grouped by client IP.</span></div></li>
+      <li><div><b>Identify the session</b><span>From the <code>X-Session-ID</code> header; otherwise from a hash of the API key plus the conversation&rsquo;s opening system and user messages.</span></div></li>
+      <li><div><b>Run the request hooks</b><span>Plugins run in <code>config.yaml</code> order. Velocity counts the request and policy scans the new user and tool messages. The first BLOCK returns <code>403</code>, the first THROTTLE <code>429</code>, before the model is called.</span></div></li>
+      <li><div><b>Check the tool results</b><span>The newest tool messages go to <code>OnToolResult</code>: error_acc counts consecutive failures, and the loop plugins note whether each result changed.</span></div></li>
+      <li><div><b>Forward upstream</b><span>Path, query and headers go through unchanged, and the global sliding window records the request. If the upstream is down, the agent gets a JSON <code>502</code>.</span></div></li>
+      <li><div><b>Check each tool call in the reply</b><span>Every tool call the model returns goes to <code>OnToolCall</code>. A repeat of an earlier call with an unchanged result becomes a <code>403</code> before the agent can run it.</span></div></li>
+      <li><div><b>Hold back streamed tool calls</b><span>In a stream, tool-call events are held until the call is complete and checked. A blocked call is never sent: the stream ends with an error event instead of <code>[DONE]</code>.</span></div></li>
+      <li><div><b>Check streamed text</b><span>Each text delta goes to <code>OnStreamChunk</code> with the rolling entropy of the last 1 KiB. A degenerate stream is cut and the upstream connection closed.</span></div></li>
+      <li><div><b>Record everything</b><span>Every hook call is timed and counted for Prometheus, incidents go to your webhooks, and each turn is saved to a conversation JSON file.</span></div></li>
     </ol>
   </div>
 </section>
@@ -700,11 +785,11 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <!-- ================= DETECTORS ================= -->
 <section class="band" id="detectors" aria-labelledby="det-title">
   <div class="wrap">
-    <h2 id="det-title">Five breakers on one panel</h2>
-    <p class="lede">Each detector watches for one way an agent runs away. Every threshold below is the shipped default and can be changed with a flag, an environment variable or <code>config.yaml</code>. Flip a lever to see what that breaker reports when it trips.</p>
+    <h2 id="det-title">Six breakers on one panel</h2>
+    <p class="lede">Each plugin watches for one way an agent runs away. The kernel runs them in the order listed in <code>config.yaml</code> and enforces the first BLOCK or THROTTLE. Values below are the shipped defaults; most can be set per plugin in <code>config.yaml</code>. Flip a lever to see what that breaker reports when it trips.</p>
 
     <div class="board">
-      <div class="board-plate" aria-hidden="true"><span>MarsadOps main panel</span><span>5 circuits</span></div>
+      <div class="board-plate" aria-hidden="true"><span>MarsadOps main panel</span><span>6 circuits</span></div>
       <ul class="bks">
         <li class="bk" id="cb-01" data-state="closed" data-open="OPEN_TRIPPED">
           <div class="bk-face">
@@ -713,10 +798,12 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
             <span class="bk-st">CLOSED</span>
           </div>
           <div class="bk-body">
-            <h3>Tool-call loop</h3>
-            <p>The same tool called again and again with near-identical arguments. Arguments are normalized, then compared by character 3-gram Jaccard similarity; free-form text arguments are also compared by 64-bit SimHash.</p>
+            <h3>Tool-call loop: SimHash</h3>
+            <span class="plug">plugins/simhash</span>
+            <p>The same tool called again with near-identical arguments while its result stays the same. Arguments are normalized first: keys sorted, and numbers, timestamps, IDs and long tokens masked. Then a 64-bit SimHash over 3-character shingles is compared.</p>
             <dl class="bk-spec">
-              <div><dt>Trips at</dt><dd>The 3rd similar call: Jaccard &ge; 0.85, or SimHash &le; 3 bits apart</dd></div>
+              <div><dt>Trips at</dt><dd>The 3rd call within 60&nbsp;s that is &le;&nbsp;3 bits apart and gets the same result. Arguments of 256+ characters must match exactly.</dd></div>
+              <div><dt>Action</dt><dd>BLOCK: <code>403</code>, or an error event in a stream</dd></div>
               <div><dt>Reports</dt><dd><code class="fc">TOOL_<wbr>CALL_<wbr>REPETITION_<wbr>LOOP</code></dd></div>
             </dl>
           </div>
@@ -728,11 +815,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
             <span class="bk-st">CLOSED</span>
           </div>
           <div class="bk-body">
-            <h3>Tool error accumulation</h3>
-            <p>A failing tool the agent keeps retrying. Tool results in the conversation are scanned for error signs such as tracebacks, &ldquo;permission denied&rdquo; or &ldquo;timed out&rdquo;.</p>
+            <h3>Tool-call loop: Jaccard</h3>
+            <span class="plug">plugins/jaccard</span>
+            <p>A second similarity test on the same normalized arguments: the share of character 3-grams two calls have in common. It catches reworded retries that SimHash scores as further apart, like a changed attempt number.</p>
             <dl class="bk-spec">
-              <div><dt>Trips at</dt><dd>4 tool errors in one conversation</dd></div>
-              <div><dt>Reports</dt><dd><code class="fc">TOOL_<wbr>ERROR_<wbr>ACCUMULATION</code></dd></div>
+              <div><dt>Trips at</dt><dd>The 3rd call within 60&nbsp;s with Jaccard &ge;&nbsp;0.8 and the same result</dd></div>
+              <div><dt>Action</dt><dd>BLOCK: <code>403</code>, or an error event in a stream</dd></div>
+              <div><dt>Reports</dt><dd><code class="fc">TOOL_<wbr>CALL_<wbr>REPETITION_<wbr>LOOP</code></dd></div>
             </dl>
           </div>
         </li>
@@ -743,11 +832,13 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
             <span class="bk-st">CLOSED</span>
           </div>
           <div class="bk-body">
-            <h3>Stream entropy</h3>
-            <p>Degenerate, repetitive output like &ldquo;! ! ! !&rdquo;. Shannon entropy in bits per byte, measured on message content, tool arguments and the response stream.</p>
+            <h3>Tool error storm</h3>
+            <span class="plug">plugins/error_acc</span>
+            <p>A failing tool the agent keeps retrying. Each tool result is judged by its structure (an <code>error</code> field, <code>"status":"failed"</code>, <code>"ok":false</code>) or by text that starts like an error. A success resets the count.</p>
             <dl class="bk-spec">
-              <div><dt>Trips at</dt><dd>Below 1.5 bits/byte, once there are 64 bytes of text or 30 bytes of tool arguments</dd></div>
-              <div><dt>Reports</dt><dd><code class="fc">MODEL_<wbr>DEGENERATION_<wbr>LOW_<wbr>ENTROPY</code></dd></div>
+              <div><dt>Trips at</dt><dd>3 consecutive errors from one tool in a session, then stays open for a 60&nbsp;s cooldown</dd></div>
+              <div><dt>Action</dt><dd>BLOCK: <code>403</code> before the model is called</dd></div>
+              <div><dt>Reports</dt><dd><code class="fc">TOOL_<wbr>ERROR_<wbr>ACCUMULATION</code></dd></div>
             </dl>
           </div>
         </li>
@@ -758,30 +849,169 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
             <span class="bk-st">CLOSED</span>
           </div>
           <div class="bk-body">
-            <h3>Session velocity</h3>
-            <p>A tight loop hammering the API. Requests are counted per session over a rolling one-second window, and hits per endpoint over ten seconds.</p>
+            <h3>Request flood</h3>
+            <span class="plug">plugins/velocity</span>
+            <p>A tight loop hammering the API. Requests are counted per session over the last second, and per endpoint path over the last minute.</p>
             <dl class="bk-spec">
-              <div><dt>Trips at</dt><dd>More than 5 requests in 1 s, or more than 20 hits on one endpoint in 10 s</dd></div>
-              <div><dt>Reports</dt><dd><code class="fc">VELOCITY_<wbr>MAX_<wbr>RPS_<wbr>EXCEEDED</code><br><code class="fc">VELOCITY_<wbr>MAX_<wbr>ENDPOINT_<wbr>REPEATS_<wbr>EXCEEDED</code></dd></div>
+              <div><dt>Trips at</dt><dd>More than 10 requests in 1&nbsp;s, or more than 50 to one path in 60&nbsp;s</dd></div>
+              <div><dt>Action</dt><dd>THROTTLE: <code>429</code> with <code class="nw">Retry-After: 5</code></dd></div>
+              <div><dt>Reports</dt><dd><code class="fc">HIGH_<wbr>RPS_<wbr>DETECTED</code><br><code class="fc">ENDPOINT_<wbr>REPEAT_<wbr>EXCEEDED</code></dd></div>
             </dl>
           </div>
         </li>
-        <li class="bk" id="cb-05" data-state="closed" data-open="429 Retry-After: 5">
+        <li class="bk" id="cb-05" data-state="closed" data-open="OPEN_TRIPPED">
           <div class="bk-face">
             <div class="bk-top"><span>CB-05</span><span class="led" aria-hidden="true"></span></div>
             <button class="lever" type="button" aria-pressed="false" aria-label="Preview CB-05 tripped"><span class="on" aria-hidden="true">ON</span><span class="handle"></span><span class="off" aria-hidden="true">OFF</span></button>
             <span class="bk-st">CLOSED</span>
           </div>
           <div class="bk-body">
-            <h3>Sliding-window budget</h3>
-            <p>Silent token burn. Tracks requests, estimated tokens (about 4 characters per token) and models over a rolling 60-second window, shown live in the terminal dashboard.</p>
+            <h3>Degenerate stream</h3>
+            <span class="plug">plugins/entropy</span>
+            <p>The model collapsing into noise or repeating itself in a streamed reply. The plugin reads the decoded text deltas, not the SSE framing. Non-streaming replies are not checked.</p>
             <dl class="bk-spec">
-              <div><dt>Trips at</dt><dd>Your request or token limit, with <code>-enforce-limits</code> on. Limits default to 0 (unlimited).</dd></div>
-              <div><dt>Reports</dt><dd><code class="fc">token limit exceeded in sliding window</code></dd></div>
+              <div><dt>Trips at</dt><dd>After 256 bytes: entropy of the last 1024 bytes below 1.5 bits/byte, or fewer than 15% distinct 8-character sequences</dd></div>
+              <div><dt>Action</dt><dd>BLOCK: the stream ends with an error event, no <code>[DONE]</code></dd></div>
+              <div><dt>Reports</dt><dd><code class="fc">MODEL_<wbr>DEGENERATION_<wbr>LOW_<wbr>ENTROPY</code><br><code class="fc">MODEL_<wbr>DEGENERATION_<wbr>REPETITION</code></dd></div>
+            </dl>
+          </div>
+        </li>
+        <li class="bk" id="cb-06" data-state="closed" data-open="POLICY_BLOCKED">
+          <div class="bk-face">
+            <div class="bk-top"><span>CB-06</span><span class="led" aria-hidden="true"></span></div>
+            <button class="lever" type="button" aria-pressed="false" aria-label="Preview CB-06 tripped"><span class="on" aria-hidden="true">ON</span><span class="handle"></span><span class="off" aria-hidden="true">OFF</span></button>
+            <span class="bk-st">CLOSED</span>
+          </div>
+          <div class="bk-body">
+            <h3>Prompt-injection tripwire</h3>
+            <span class="plug">plugins/policy</span>
+            <p>Well-known injection phrasings in the newest user and tool messages, after lowercasing and collapsing whitespace. It is a tripwire, not a full defence: paraphrases get through.</p>
+            <dl class="bk-spec">
+              <div><dt>Trips at</dt><dd>Any of 3 default patterns: &ldquo;ignore previous instructions&rdquo;, &ldquo;reveal your system prompt&rdquo;, &ldquo;you are now DAN&rdquo; and their close variants</dd></div>
+              <div><dt>Action</dt><dd>BLOCK: <code>403</code> before the model is called</dd></div>
+              <div><dt>Reports</dt><dd><code class="fc">DECLARATIVE_<wbr>POLICY_<wbr>VIOLATION</code></dd></div>
             </dl>
           </div>
         </li>
       </ul>
+    </div>
+
+    <dl class="acts">
+      <div><dt class="c-red"><code>403</code> BLOCK</dt><dd>Stops the request, or replaces a tool call in the model&rsquo;s reply, with an OpenAI-style error and an SRE incident.</dd></div>
+      <div><dt class="c-acc"><code>429</code> THROTTLE</dt><dd>Slows the agent down with <code class="nw">Retry-After: 5</code> and the same incident body.</dd></div>
+      <div><dt class="c-cy"><code>SSE</code> Stream cut</dt><dd>A streamed reply already sent <code>200</code>, so it ends with one error event, and the upstream stream is closed.</dd></div>
+    </dl>
+    <p class="board-foot"><b>Plus WASM extensions.</b> The shipped <code>tool-guard</code> extension blocks dangerous commands, URLs outside an allowlist and leaked credentials in tool calls and results (<code>TOOL_GUARD_*</code>). If a plugin itself errors or panics, the fail policy decides: <code>open</code> (default) lets the request through, <code>closed</code> blocks it with <code>PLUGIN_ERROR_FAIL_CLOSED</code>.</p>
+  </div>
+</section>
+
+<!-- ================= EXTEND ================= -->
+<section class="band" id="extend" aria-labelledby="ext-title">
+  <div class="wrap">
+    <h2 id="ext-title">Write your own breaker</h2>
+    <p class="lede">A breaker is a plugin. The kernel calls its hooks and enforces the verdict it returns: <code>ALLOW</code>, <code>BLOCK</code>, <code>THROTTLE</code> or <code>MUTATE</code>. Write a native Go plugin to see every hook, or a sandboxed WASM extension you can load into a running proxy.</p>
+
+    <div class="ext">
+      <div class="ext-card">
+        <div class="ext-info">
+        <h3>Native Go plugin <code>.so</code></h3>
+        <ul class="hooks">
+          <li><code>OnRequest</code> before the model is called (the only hook where <code>MUTATE</code> rewrites the body)</li>
+          <li><code>OnToolCall</code> for each tool call the model returns</li>
+          <li><code>OnStreamChunk</code> for each streamed text delta, with the rolling entropy</li>
+          <li><code>OnResponse</code> after the reply, observe only</li>
+          <li>Optional: <code>OnToolResult</code> for tool results, <code>Reset</code> for the reset API</li>
+        </ul>
+        <p class="note">Build it with the same Go version and flags as the proxy. Native plugins need Linux or macOS and load at startup.</p>
+        </div>
+        <div class="ext-code">
+        <div class="code">
+          <div class="code-bar"><span>plugins/myguard/main.go</span><button class="copy" type="button" aria-label="Copy the example plugin"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>package main
+
+import (
+	"net/http"
+	"strings"
+	"time"
+
+	"circuit-breaker-proxy/inspector"
+)
+
+type Guard struct{}
+
+// The loader looks up this exported symbol.
+var Measure inspector.Measure = &amp;Guard{}
+
+func (g *Guard) Name() string                          { return "NoDropTable" }
+func (g *Guard) Init(cfg map[string]interface{}) error { return nil }
+
+func (g *Guard) OnToolCall(ctx *inspector.RequestContext, tool, args string,
+	isErr bool, errMsg string) (*inspector.Verdict, error) {
+	if tool == "run_sql" &amp;&amp; strings.Contains(strings.ToLower(args), "drop table") {
+		return &amp;inspector.Verdict{Action: inspector.VerdictBlock, Incident: &amp;inspector.SREIncident{
+			IncidentID: inspector.GenerateIncidentID(), Timestamp: time.Now(),
+			CircuitState: "OPEN_TRIPPED", FailureClass: "SQL_DROP_TABLE", ToolName: tool,
+			Mitigation: "Blocked a DROP TABLE", ActionRequired: "Ask a human to run it",
+		}}, nil
+	}
+	return nil, nil // nil = ALLOW
+}
+
+// Hooks this breaker doesn't use: return nil (ALLOW).
+func (g *Guard) OnRequest(*inspector.RequestContext, *http.Request, *inspector.OpenAIRequest) (*inspector.Verdict, error) {
+	return nil, nil
+}
+func (g *Guard) OnStreamChunk(*inspector.RequestContext, []byte, uint32, float64) (*inspector.Verdict, error) {
+	return nil, nil
+}
+func (g *Guard) OnResponse(*inspector.RequestContext, *inspector.RecordedResponse) (*inspector.Verdict, error) {
+	return nil, nil
+}
+func (g *Guard) Close() error { return nil }</code></pre>
+        </div>
+        <div class="code">
+          <div class="code-bar"><span>build and enable</span><button class="copy" type="button" aria-label="Copy plugin build commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>go build -buildmode=plugin -o plugins/myguard.so ./plugins/myguard
+<span class="c"># add  - "./plugins/myguard.so"  under plugins: in config.yaml, then restart</span></code></pre>
+        </div>
+        </div>
+      </div>
+
+      <div class="ext-card">
+        <div class="ext-info">
+        <h3>WASM extension <code>.wasm</code></h3>
+        <ul class="hooks">
+          <li>Exports <code>allocate</code> and <code>deallocate</code>, plus any of <code>on_request</code>, <code>on_tool_call</code>, <code>on_tool_result</code> and <code>on_init</code></li>
+          <li>Sandboxed in wazero: 10&nbsp;MiB of memory, 250&nbsp;ms per call by default, no filesystem</li>
+          <li>Hot-load with <code>POST /api/v1/measures/load</code> (API token required). Hot-loaded extensions get no config and join the end of the pipeline</li>
+          <li>Worked example: <code>extensions/tool-guard</code> with <code>blocked_commands</code>, <code>allowed_domains</code> and <code>block_secrets</code></li>
+        </ul>
+        <p class="note">WASM extensions don&rsquo;t receive stream chunks or responses. To give one a config, list it in <code>config.yaml</code> instead of hot-loading it.</p>
+        </div>
+        <div class="ext-code">
+        <div class="code">
+          <div class="code-bar"><span>the ABI, in Go 1.24+</span><button class="copy" type="button" aria-label="Copy the WASM ABI example"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>//go:wasmexport allocate
+func allocate(size uint32) uint32 // the host writes the input JSON here
+
+//go:wasmexport deallocate
+func deallocate(ptr, size uint32)
+
+//go:wasmexport on_tool_call
+func onToolCall(ptr, size uint32) uint64 // 0 = ALLOW, else resultPtr&lt;&lt;32 | resultLen
+
+<span class="c">// input:  {"context":{...},"tool_name":"...","arguments":"...","is_error":false,"error_msg":""}
+// result: {"Action":"BLOCK","Incident":{"failure_class":"...","mitigation":"...",
+//          "action_required":"..."}}</span></code></pre>
+        </div>
+        <div class="code">
+          <div class="code-bar"><span>build and hot-load</span><button class="copy" type="button" aria-label="Copy WASM build and load commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o guard.wasm ./extensions/my-guard
+curl -X POST "http://localhost:8080/api/v1/measures/load?name=my-guard" \
+  -H "Authorization: Bearer $API_AUTH_TOKEN" --data-binary @guard.wasm</code></pre>
+        </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -790,11 +1020,11 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band" id="try" aria-labelledby="try-title">
   <div class="wrap">
     <h2 id="try-title">Run the detector math in your browser</h2>
-    <p class="lede">Both calculators follow the Go code exactly: the same argument normalization, the same byte-level 3-gram sets and the same entropy formula. Edit the text and the verdict updates.</p>
+    <p class="lede">These calculators run the same steps as the Go plugins: the same argument masking, the same 3-gram Jaccard and SimHash, and the same entropy and repetition checks, replayed as a stream. Their results were checked against the real plugin code on the same inputs.</p>
 
     <div class="calcs">
       <form class="calc" id="calc-j" aria-labelledby="cj-t">
-        <div class="calc-h"><h3 id="cj-t">Tool-call similarity</h3><span>CB-01</span></div>
+        <div class="calc-h"><h3 id="cj-t">Tool-call similarity</h3><span>CB-01 &middot; CB-02</span></div>
         <div>
           <label for="j-a">Previous call arguments</label>
           <textarea id="j-a" rows="2" spellcheck="false" autocomplete="off">{"query":"kubernetes pod crashloop fix (attempt 0)"}</textarea>
@@ -805,13 +1035,15 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         </div>
         <div class="chips" role="group" aria-label="Load an example">
           <button class="chip" type="button" data-ja='{"query":"kubernetes pod crashloop fix (attempt 0)"}' data-jb='{"query":"kubernetes pod crashloop fix (attempt 1)"}'>Mutated attempt</button>
-          <button class="chip" type="button" data-ja='{"region":"eu-west-1","limit":50}' data-jb='{ "limit": 50.0, "region": "eu-west-1" }'>Reordered keys</button>
+          <button class="chip" type="button" data-ja='{"region":"eu-west-1","limit":50}' data-jb='{ "limit": 75, "region": "eu-west-1" }'>Reordered keys, new number</button>
+          <button class="chip" type="button" data-ja='{"q":"status","since":"2026-09-26T10:00:00Z","req":"3f2b8c1e-9a4d-4e8b-b1c2-0d9e8f7a6b5c"}' data-jb='{"q":"status","since":"2026-09-26T10:05:31.120+03:00","req":"a1b2c3d4-0000-4e8b-b1c2-123456789abc"}'>New timestamp and ID</button>
           <button class="chip" type="button" data-ja='{"query":"kubernetes pod crashloop fix (attempt 0)"}' data-jb='{"query":"postgres connection pool exhausted"}'>Different task</button>
         </div>
         <output class="readout" id="j-out" for="j-a j-b" aria-live="polite">
-          <span class="readout-top"><span class="big" id="j-val">0.887</span><span class="pill v-match" id="j-pill">MATCH</span></span>
-          <span><span class="meter v-match" id="j-meter"><span class="fill" style="width:88.7%"></span><span class="mark" style="left:85%"><span>0.85</span></span></span><span class="scale" aria-hidden="true"><span>0</span><span>1</span></span></span>
-          <span class="verdict" id="j-verdict"><b>Near-duplicate.</b> This call counts toward the loop limit; the 3rd similar call trips CB-01.</span>
+          <span class="readout-top"><span class="big" id="j-val">0.887</span><span class="pill v-match" id="j-pill">REPEAT</span></span>
+          <span><span class="meter v-match" id="j-meter"><span class="fill" style="width:88.7%"></span><span class="mark" style="left:80%"><span>0.8</span></span></span><span class="scale" aria-hidden="true"><span>Jaccard 0</span><span>1</span></span></span>
+          <span class="ro2" id="j-sim">SimHash: <b>4 bits</b> apart (a match needs &le; 3)</span>
+          <span class="verdict" id="j-verdict"><b>Counts as a repeat:</b> Jaccard matches, SimHash doesn&rsquo;t. If the tool&rsquo;s result is also unchanged, the 3rd such call within 60&nbsp;s is blocked with 403 TOOL_CALL_REPETITION_LOOP.</span>
         </output>
         <details class="work">
           <summary>Show the working</summary>
@@ -819,34 +1051,39 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
             <div><dt>Normalized previous</dt><dd id="j-na"></dd></div>
             <div><dt>Normalized current</dt><dd id="j-nb"></dd></div>
             <div><dt>3-gram sets</dt><dd id="j-sets"></dd></div>
+            <div><dt>SimHash fingerprints</dt><dd id="j-fp"></dd></div>
             <div><dt>Mode</dt><dd id="j-mode"></dd></div>
           </dl>
         </details>
       </form>
 
       <form class="calc" id="calc-e" aria-labelledby="ce-t">
-        <div class="calc-h"><h3 id="ce-t">Text entropy</h3><span>CB-03</span></div>
+        <div class="calc-h"><h3 id="ce-t">Streamed-text degeneration</h3><span>CB-05</span></div>
         <div>
-          <label for="e-in">Message content</label>
-          <textarea id="e-in" rows="4" spellcheck="false" autocomplete="off">The pod is OOMKilled: its memory limit is lower than what the container needs at startup. Raise the limit in the deployment spec, or lower the heap size.</textarea>
+          <label for="e-in">Streamed reply</label>
+          <textarea id="e-in" rows="5" spellcheck="false" autocomplete="off">The pod is in CrashLoopBackOff because the container exits with code 137, which means it was OOMKilled. Its memory limit (256Mi) is lower than what the JVM needs at startup. Raise resources.limits.memory in the deployment spec to 512Mi, or cap the heap with -Xmx200m, then run kubectl rollout restart deployment/api and watch kubectl get pods -w until the restart count stops climbing.</textarea>
         </div>
         <div class="chips" role="group" aria-label="Load an example">
           <button class="chip" type="button" data-e="healthy">Healthy reply</button>
-          <button class="chip" type="button" data-e="spam">Degenerate spam</button>
+          <button class="chip" type="button" data-e="noise">Noise</button>
+          <button class="chip" type="button" data-e="loop">Apology loop</button>
+          <button class="chip" type="button" data-e="short">Short burst</button>
         </div>
         <output class="readout" id="e-out" for="e-in" aria-live="polite">
-          <span class="readout-top"><span class="big" id="e-val">4.11<small>bits/byte</small></span><span class="pill v-ok" id="e-pill">PASS</span></span>
-          <span><span class="meter v-ok" id="e-meter"><span class="fill" style="width:51%"></span><span class="mark" style="left:18.75%"><span>1.5</span></span></span><span class="scale" aria-hidden="true"><span>0</span><span>8 bits/byte</span></span></span>
-          <span class="verdict" id="e-verdict"><b>Passes.</b> 153 bytes, above the 1.5 bits/byte floor.</span>
+          <span class="readout-top"><span class="big" id="e-val">4.59<small>bits/byte</small></span><span class="pill v-ok" id="e-pill">PASS</span></span>
+          <span><span class="meter v-ok" id="e-meter"><span class="fill" style="width:57.4%"></span><span class="mark" style="left:18.75%"><span>1.5</span></span></span><span class="scale" aria-hidden="true"><span>0</span><span>8 bits/byte</span></span></span>
+          <span class="ro2" id="e-rep">Distinct 8-character sequences: <b>98%</b> (cut below 15%)</span>
+          <span class="verdict" id="e-verdict"><b>Passes.</b> 385 bytes streamed without tripping either check.</span>
         </output>
         <div>
           <div class="hist" id="e-hist" aria-hidden="true"></div>
-          <p class="work" id="e-hist-cap" style="margin:6px 0 0">Byte frequencies, most common first.</p>
+          <p class="work" id="e-hist-cap" style="margin:6px 0 0">Byte frequencies in the rolling window, most common first.</p>
         </div>
+        <p class="calc-note">Replayed as 4-character deltas, the way a streamed reply reaches the plugin. Neither check runs before 256 bytes.</p>
       </form>
     </div>
 
-    <p class="simhash-note"><b>What about SimHash?</b> It isn&rsquo;t recomputed here. The proxy splits the tool name and arguments into words, hashes each word with 64-bit FNV-1 and folds them into a 64-bit fingerprint; two calls whose fingerprints differ in 3 bits or fewer count as similar. SimHash decides for free-form text arguments. For JSON arguments, the normal case for OpenAI tool calls, Jaccard alone decides.</p>
+    <p class="simhash-note"><b>What the calculators leave out.</b> A loop also needs the tool&rsquo;s result to stay the same: a new page of results or a rising progress value counts as progress, not a repeat. Calls are compared only with earlier calls to the same tool in the same session within 60&nbsp;seconds.</p>
   </div>
 </section>
 
@@ -855,65 +1092,71 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
   <div class="wrap split">
     <div>
       <h2 id="inc-title">Every trip comes with an incident report</h2>
-      <p class="lede">The agent, and whoever is on call, gets a structured SRE incident instead of a silent failure: what tripped, which calls caused it, and what to do next.</p>
+      <p class="lede">The agent gets a structured error it can act on instead of a silent failure, and whoever is on call can get the same incident through a webhook: what tripped, the evidence, and what to do next.</p>
       <dl class="paths">
         <div>
-          <dt class="c-red"><code>429</code> At the edge</dt>
-          <dd>When the history check or the velocity detector trips, the request never reaches the model. The agent gets <code>429 Too Many Requests</code>, a <code>Retry-After</code> header (10 s for breaker trips, 5 s for velocity) and the incident as JSON.</dd>
+          <dt class="c-red"><code>403</code> Blocked</dt>
+          <dd>A BLOCK before the model is called (policy, error storm), or on a tool call in the model&rsquo;s reply (loops, tool-guard). The body is JSON with <code>error</code> and <code>sre_incident</code>.</dd>
         </div>
         <div>
-          <dt class="c-amb"><code>SSE</code> Mid-stream</dt>
-          <dd>When a live streamed response trips a breaker, the proxy closes the upstream stream and appends an <code>event: error</code> frame carrying the same incident, instead of <code>[DONE]</code>. The status stays 200 because the headers were already sent.</dd>
+          <dt class="c-acc"><code>429</code> Throttled</dt>
+          <dd>A THROTTLE from the velocity plugin, with <code class="nw">Retry-After: 5</code> and the same body.</dd>
+        </div>
+        <div>
+          <dt class="c-cy"><code>SSE</code> Stream cut</dt>
+          <dd>A streamed reply has already sent <code>200</code>. The proxy drops any held-back tool-call events, sends one final <code>data: {error, sre_incident}</code> event, closes the upstream stream and never sends <code>[DONE]</code>.</dd>
         </div>
       </dl>
       <ul class="fields">
-        <li><code>failure_class</code> names the breaker that tripped.</li>
-        <li><code>violating_calls</code> lists the calls behind it, with similarity and entropy.</li>
-        <li><code>mitigation</code> and <code>action_required</code> say what happened and what to fix.</li>
+        <li><code>error.code</code> is the failure class in lowercase and <code>error.type</code> is <code>circuit_breaker</code>, so OpenAI-compatible clients treat it as an API error.</li>
+        <li><code>failure_class</code> names what tripped; <code>details</code> holds the plugin&rsquo;s evidence.</li>
+        <li><code>mitigation</code> and <code>action_required</code> say what happened and what to change.</li>
       </ul>
     </div>
-    <figure class="codebox" style="margin:0">
-      <div class="codebox-bar"><span class="st">HTTP/1.1 429 Too Many Requests</span><span>Retry-After: 10</span></div>
-<pre tabindex="0" aria-label="Incident JSON"><code class="json-hl">{
+    <div class="boxes">
+      <figure class="codebox">
+        <div class="codebox-bar"><span class="st">HTTP/1.1 403 Forbidden</span><span>Content-Type: application/json</span></div>
+<pre tabindex="0" aria-label="403 incident JSON"><code class="json-hl">{
+  "error": {
+    "message": "Circuit breaker tripped (TOOL_CALL_REPETITION_LOOP): Blocked call 3 to web_search: similar calls keep returning the same result. Action required: Change approach instead of repeating the call; review agent prompt or tool logic",
+    "type": "circuit_breaker",
+    "code": "tool_call_repetition_loop"
+  },
   "sre_incident": {
-    "incident_id": "inc_20260925_195529_0e95671b",
-    "timestamp": "2026-09-25T19:55:29.23125+03:00",
+    "incident_id": "inc_20260926_114842_459832ad",
+    "timestamp": "2026-09-26T11:48:42.985597+03:00",
     "circuit_state": "OPEN_TRIPPED",
     "failure_class": "TOOL_CALL_REPETITION_LOOP",
     "tool_name": "web_search",
-    "tool_arguments": "{\"query\":\"kubernetes pod crashloop fix (attempt 2)\"}",
-    "violating_calls": [
-      {
-        "tool_name": "web_search",
-        "arguments": "{\"query\":\"kubernetes pod crashloop fix (attempt 0)\"}",
-        "similarity_score": 1,
-        "entropy": 4.55651772861486
-      },
-      {
-        "tool_name": "web_search",
-        "arguments": "{\"query\":\"kubernetes pod crashloop fix (attempt 1)\"}",
-        "hamming_distance": 1,
-        "similarity_score": 0.984375,
-        "entropy": 4.55651772861486
-      },
-      {
-        "tool_name": "web_search",
-        "arguments": "{\"query\":\"kubernetes pod crashloop fix (attempt 2)\"}",
-        "similarity_score": 1,
-        "entropy": 4.55651772861486
-      }
-    ],
-    "simhash": "0x9889dd5823a517a5",
-    "similarity_score": 1,
-    "entropy": 4.55651772861486,
-    "observed_count": 3,
-    "threshold": 3,
-    "mitigation": "Request rejected at edge - repetitive tool call loop detected via SimHash / Jaccard similarity",
-    "action_required": "Modify prompt or conversation context to eliminate repetitive tool loops"
+    "mitigation": "Blocked call 3 to web_search: similar calls keep returning the same result",
+    "action_required": "Change approach instead of repeating the call; review agent prompt or tool logic",
+    "details": {
+      "observed_count": 3,
+      "similarity": 0.8867924528301887,
+      "threshold": 3,
+      "tool_name": "web_search"
+    }
   }
 }</code></pre>
-      <figcaption>Real response body from the proxy for the loop replayed above, pretty-printed. Per-call timestamps are omitted.</figcaption>
-    </figure>
+        <figcaption>Real response for the loop replayed at the top of the page, pretty-printed.</figcaption>
+      </figure>
+      <figure class="codebox">
+        <div class="codebox-bar"><span class="st">HTTP/1.1 429 Too Many Requests</span><span>Retry-After: 5</span></div>
+<pre tabindex="0" aria-label="429 throttle JSON"><code class="json-hl">{
+  "error": {"message": "Circuit breaker tripped (HIGH_RPS_DETECTED): Throttling requests to prevent DoS. Action required: Implement client-side backoff", "type": "circuit_breaker", "code": "high_rps_detected"},
+  "sre_incident": {"circuit_state": "VELOCITY_BLOCKED", "failure_class": "HIGH_RPS_DETECTED",
+    "details": {"observed_rps": 13, "threshold": 10}, ...}
+}</code></pre>
+        <figcaption>Real response to the 13th request in one second on one session, shortened.</figcaption>
+      </figure>
+      <figure class="codebox">
+        <div class="codebox-bar"><span>HTTP/1.1 200 OK, text/event-stream</span><span class="st">stream cut</span></div>
+<pre tabindex="0" aria-label="Streaming error event"><code class="json-hl">data: {"choices": [{"delta": {"content": "I will try again. "}, ...}], ...}
+... 13 more text events ...
+data: {"error": {"message": "Circuit breaker tripped (MODEL_DEGENERATION_REPETITION): Terminated stream: the model is repeating the same text. Action required: ...", "type": "circuit_breaker", "code": "model_degeneration_repetition"}, "sre_incident": {"circuit_state": "OPEN_TRIPPED", "failure_class": "MODEL_DEGENERATION_REPETITION", "details": {"bytes_generated": 270, "distinct_ratio": 0.0684, "threshold": 0.15, "window_chars": 270}, ...}}</code></pre>
+        <figcaption>Real stream from a model repeating one sentence, shortened. The last event carries the incident; no <code>[DONE]</code> follows.</figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
@@ -921,20 +1164,59 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band obs" id="observability" aria-labelledby="obs-title">
   <div class="wrap">
     <h2 id="obs-title">Prevention in the proxy, visibility in Grafana</h2>
-    <p class="lede">The circuit breaker stops a runaway agent while it&rsquo;s happening. The observability stack shows what your agents cost and how each model behaves over hours and days.</p>
+    <p class="lede">The breaker exports its own Prometheus metrics, so every block, throttle and plugin call lands on a ready-made Grafana dashboard. The LiteLLM stack shows what each model costs and how it behaves behind the gateway.</p>
 
     <div class="pv">
-      <div><h3><span class="led" aria-hidden="true"></span>Prevention: circuit breaker proxy</h3><p>Acts on the request in flight. Blocks loops, error storms, degenerate output and runaway velocity, and returns an incident the agent can act on.</p></div>
-      <div class="vis"><h3><span class="led" aria-hidden="true"></span>Visibility: observability stack</h3><p>Records every call that reaches the gateway. Latency, time to first byte, spend, tokens, errors and failed fallbacks, per model.</p></div>
+      <div><h3><span class="led" aria-hidden="true"></span>Circuit breaker metrics</h3><p>12 <code>circuit_breaker_*</code> metric families at <code>/metrics</code> on the proxy port, or on their own address with <code>METRICS_ADDR</code>. Shown on the &ldquo;Circuit Breaker Proxy&rdquo; dashboard on Grafana <code>:3001</code>.</p></div>
+      <div class="vis"><h3><span class="led" aria-hidden="true"></span>LiteLLM stack</h3><p>Records every call that reaches the gateway: latency, time to first token, spend, tokens, errors and failed fallbacks, per model. Shown on Grafana <code>:3000</code>.</p></div>
     </div>
 
     <div class="obs-grid">
       <div>
-        <h3>The stack</h3>
+        <h3>Key breaker metrics</h3>
+        <table class="models mx">
+          <thead><tr><th scope="col">Metric</th><th scope="col">Labels</th><th scope="col">Counts</th></tr></thead>
+          <tbody>
+            <tr><td><code>circuit_breaker_<wbr>incidents_<wbr>total</code></td><td><code>measure, hook, action, failure_class</code></td><td>Every BLOCK and THROTTLE</td></tr>
+            <tr><td><code>circuit_breaker_<wbr>measure_<wbr>evaluations_<wbr>total</code></td><td><code>measure, hook, result</code></td><td>Every hook call: allow, block, throttle, mutate or error</td></tr>
+            <tr><td><code>circuit_breaker_<wbr>measure_<wbr>duration_<wbr>seconds</code></td><td><code>measure, hook</code></td><td>Time inside each hook: the proxy&rsquo;s own overhead</td></tr>
+            <tr><td><code>circuit_breaker_<wbr>http_<wbr>requests_<wbr>total</code></td><td><code>method, code</code></td><td>Proxied requests by status</td></tr>
+            <tr><td><code>circuit_breaker_<wbr>active_<wbr>measures</code></td><td><code>&ndash;</code></td><td>Plugins loaded; 0 means unprotected</td></tr>
+            <tr><td><code>circuit_breaker_<wbr>webhook_<wbr>deliveries_<wbr>total</code></td><td><code>result</code></td><td>Incident webhook successes and failures</td></tr>
+          </tbody>
+        </table>
+        <p class="note">Plus request duration, upstream errors, window rejections, window gauges and estimated tokens, and the Go runtime and process metrics.</p>
+        <h3 class="sub-h" style="margin-top:32px;font-size:1.1875rem">See it with demo traffic</h3>
+        <div class="code">
+          <div class="code-bar"><span>shell, in the breaker repo</span><button class="copy" type="button" aria-label="Copy the monitoring demo commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>pip install openai        <span class="c"># the traffic loop drives the benchmark</span>
+cd monitoring &amp;&amp; ./up.sh  <span class="c"># proxy :8080, Prometheus :9090, Grafana :3001</span>
+open http://localhost:3001/d/circuit-breaker</code></pre>
+        </div>
+        <p class="note">The demo replays the benchmark&rsquo;s scripted scenarios against a mock LLM every 15&nbsp;seconds. Use <code>./up.sh --no-traffic</code> to point your own agents at <code>:8080</code> instead, and <code>./down.sh</code> to stop.</p>
+      </div>
+      <div>
+        <h3>&ldquo;Circuit Breaker Proxy&rdquo; dashboard <small>51 panels, 8 rows</small></h3>
+        <ul class="dash cb">
+          <li><b>Health at a glance</b><span>Proxy up, active measures, requests/s, share stopped, plugin error ratio, p95, fail-closed blocks</span><code>circuit_breaker_<wbr>active_<wbr>measures</code></li>
+          <li><b>Traffic</b><span>Requests by status (403 blocked, 429 throttled, 502 upstream), latency percentiles, heatmap</span><code>circuit_breaker_<wbr>http_<wbr>requests_<wbr>total</code></li>
+          <li><b>Protection</b><span>Incidents by failure class, plugin and hook; loops, error storms, cut streams, injection hits, throttles</span><code>circuit_breaker_<wbr>incidents_<wbr>total</code></li>
+          <li><b>Plugins &amp; extensions</b><span>Hook p99 and outcomes per plugin, error ratio, p99 against the 250&nbsp;ms WASM timeout</span><code>circuit_breaker_<wbr>measure_<wbr>duration_<wbr>seconds</code></li>
+          <li><b>Upstream LLM</b><span>Upstream failures, 5xx by code, 429s passed through, very long requests</span><code>circuit_breaker_<wbr>upstream_<wbr>errors_<wbr>total</code></li>
+          <li><b>Tokens &amp; cost</b><span>Estimated input tokens and cost from a price variable: estimates, not billing</span><code>circuit_breaker_<wbr>estimated_<wbr>request_<wbr>tokens_<wbr>total</code></li>
+          <li><b>Incident delivery</b><span>Webhook deliveries, success ratio, incidents against notifications</span><code>circuit_breaker_<wbr>webhook_<wbr>deliveries_<wbr>total</code></li>
+          <li><b>Runtime</b><span>Memory, heap, CPU, goroutines, file descriptors, uptime and restarts</span><code>process_*, go_*</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="obs-grid">
+      <div>
+        <h3>The LiteLLM stack</h3>
         <ul class="svc">
           <li><b>LiteLLM</b><code>:4000</code>One OpenAI-compatible endpoint and one master key for every model. Exports Prometheus metrics and keeps spend logs in Postgres.</li>
           <li><b>Prometheus</b><code>:9090</code>Scrapes LiteLLM&rsquo;s <code>/metrics</code> every 5 seconds.</li>
-          <li><b>Grafana</b><code>:3000</code>Starts with the Prometheus data source already provisioned. Import the LiteLLM dashboard from <code>24965_rev2.json</code>.</li>
+          <li><b>Grafana</b><code>:3000</code>Starts with the Prometheus data source provisioned. Import the LiteLLM dashboard from <code>24965_rev2.json</code>.</li>
         </ul>
         <h3>Models behind the gateway</h3>
         <table class="models">
@@ -947,20 +1229,18 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
         </table>
       </div>
       <div>
-        <h3>What the dashboard shows</h3>
+        <h3>What the LiteLLM dashboard shows</h3>
         <ul class="dash">
           <li><b>Models Latency</b><span>p50, p90, p95 and p99 per model</span><code>litellm_<wbr>llm_<wbr>api_<wbr>latency_<wbr>metric</code></li>
-          <li><b>Models Time To First Byte Latency</b><span>Same percentiles, for streaming calls</span><code>litellm_<wbr>llm_<wbr>api_<wbr>time_<wbr>to_<wbr>first_<wbr>token_<wbr>metric</code></li>
+          <li><b>Time To First Byte</b><span>Same percentiles, for streaming calls</span><code>litellm_<wbr>llm_<wbr>api_<wbr>time_<wbr>to_<wbr>first_<wbr>token_<wbr>metric</code></li>
           <li><b>Requests Rate</b><span>By route, model, team and user</span><code>litellm_<wbr>proxy_<wbr>total_<wbr>requests_<wbr>metric_<wbr>total</code></li>
           <li><b>Tokens Rate</b><span>Input and output tokens per model</span><code>litellm_<wbr>input_<wbr>tokens_<wbr>metric_<wbr>total litellm_<wbr>output_<wbr>tokens_<wbr>metric_<wbr>total</code></li>
-          <li><b>Spend Rate and Total Spend per Model</b><span>USD, from LiteLLM&rsquo;s price map</span><code>litellm_<wbr>spend_<wbr>metric_<wbr>total</code></li>
-          <li><b>Failed Requests</b><span>Top 10 and the last 25</span><code>litellm_<wbr>proxy_<wbr>failed_<wbr>requests_<wbr>metric_<wbr>total</code></li>
-          <li><b>Failed Fallbacks</b><span>Top 10 and the last 25</span><code>litellm_<wbr>deployment_<wbr>failed_<wbr>fallbacks_<wbr>total</code></li>
-          <li><b>LLM Deployment Analytics</b><span>Health of each model deployment</span><code>litellm_<wbr>deployment_<wbr>state</code></li>
+          <li><b>Spend</b><span>USD, from LiteLLM&rsquo;s price map</span><code>litellm_<wbr>spend_<wbr>metric_<wbr>total</code></li>
+          <li><b>Failed Requests and Fallbacks</b><span>Top 10 and the last 25</span><code>litellm_<wbr>proxy_<wbr>failed_<wbr>requests_<wbr>metric_<wbr>total</code></li>
         </ul>
-        <p class="note">Requests the breaker rejects never reach LiteLLM, so their incidents appear in the proxy&rsquo;s 429 responses and terminal alerts rather than in Grafana.</p>
       </div>
     </div>
+    <p class="note">The two stacks are separate and both publish Prometheus on <code>:9090</code>, so run one at a time or remap a port. Requests the breaker stops before the model never reach LiteLLM, so they show on the breaker dashboard only. Fifteen ready-made alert rules are documented in <code>PROMETHEUS_QUERIES.md</code>; none are loaded by default.</p>
   </div>
 </section>
 
@@ -968,14 +1248,28 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band" id="quality" aria-labelledby="qa-title">
   <div class="wrap">
     <h2 id="qa-title">Built and tested like infrastructure</h2>
+    <p class="lede">The team&rsquo;s own measurements on one laptop. The benchmark is simulated: 52 scripted scenarios (31 attacks, 21 benign) run in streaming and non-streaming mode against a fake LLM, 101 runs in all.</p>
     <ul class="qa">
-      <li><span class="v"><span class="led" aria-hidden="true"></span>44/44</span><span class="l">Tests passing across the inspector and proxy packages</span><code>go test ./...</code></li>
-      <li><span class="v"><span class="led" aria-hidden="true"></span>Clean</span><span class="l">Race detector finds no data races</span><code>go test -race ./...</code></li>
-      <li><span class="v"><span class="led" aria-hidden="true"></span>Clean</span><span class="l">Static analysis passes</span><code>go vet ./...</code></li>
-      <li><span class="v">0 B/op</span><span class="l">Entropy engine: 0 allocations per operation</span><code>go test -bench=BenchmarkEntropy -benchmem</code></li>
-      <li><span class="v">~163 ns</span><span class="l">Per 64-byte chunk fed to the entropy engine (Apple Silicon)</span><code>AddBytes, 64 B</code></li>
-      <li><span class="v">4 tiers</span><span class="l">Config: defaults, then YAML, then env, then flags</span><code>config.yaml &rarr; ENV &rarr; -flags</code></li>
+      <li><span class="v">44/60</span><span class="l">Attack runs stopped (73%), against 0/60 with no gateway</span><code>simulated benchmark</code></li>
+      <li><span class="v">4/41</span><span class="l">False positives on benign runs</span><code>simulated benchmark</code></li>
+      <li><span class="v">12</span><span class="l">Attack runs stopped before the request reached the LLM</span><code>simulated benchmark</code></li>
+      <li><span class="v">+0.16 ms</span><span class="l">Median added latency with all 6 plugins, non-streaming (+0.22&nbsp;ms streaming)</span><code>local mock, saving off</code></li>
+      <li><span class="v">~11,300</span><span class="l">Requests per second through the proxy at 32 concurrent connections</span><code>local mock, 6 plugins</code></li>
+      <li><span class="v"><span class="led" aria-hidden="true"></span>203/203</span><span class="l">Go tests pass; the race detector and <code>go vet</code> are clean</span><code>go test -race ./...</code></li>
+      <li><span class="v">0 B/op</span><span class="l">Entropy engine allocations, ~182&nbsp;ns per 64-byte chunk</span><code>go test -bench . ./stream</code></li>
+      <li><span class="v">51</span><span class="l">Grafana panels over 12 breaker metric families</span><code>monitoring/up.sh</code></li>
     </ul>
+
+    <h3 class="sub-h">Attack runs stopped, by category</h3>
+    <ul class="cats">
+      <li><span>Tool-call loops</span><span class="bar" aria-hidden="true"><i style="width:100%"></i></span><b>14/14</b></li>
+      <li><span>Dangerous commands <small>(tool-guard)</small></span><span class="bar" aria-hidden="true"><i style="width:100%"></i></span><b>6/6</b></li>
+      <li><span>Runaway traffic</span><span class="bar" aria-hidden="true"><i style="width:100%"></i></span><b>2/2</b></li>
+      <li><span>Error storms</span><span class="bar" aria-hidden="true"><i style="width:75%"></i></span><b>6/8</b></li>
+      <li><span>Prompt injection</span><span class="bar" aria-hidden="true"><i style="width:55.6%"></i></span><b>10/18</b></li>
+      <li><span>Degenerate output <small>(6/6 when streaming)</small></span><span class="bar" aria-hidden="true"><i style="width:50%"></i></span><b>6/12</b></li>
+    </ul>
+    <p class="note q-note">Benchmark recorded 2026-09-26 with the 6 plugins and the tool-guard extension; no real model was called. Latency and throughput were measured against a local mock upstream with conversation saving off, so they show the proxy&rsquo;s own cost, not model time.</p>
   </div>
 </section>
 
@@ -983,45 +1277,79 @@ h1{font-weight:800;font-stretch:125%;font-size:clamp(2.1rem,0.9rem + 5.4vw,5.1re
 <section class="band" id="quickstart" aria-labelledby="qs-title">
   <div class="wrap">
     <h2 id="qs-title">Run it locally</h2>
-    <p class="lede">The proxy is a single Go binary. The observability stack is one <code>docker compose</code> file. Run either on its own, or chain them.</p>
+    <p class="lede">The proxy is a Go binary plus its plugin files. Each observability stack is one <code>docker compose</code> setup. Run them on their own, or chain them.</p>
 
     <div class="tabs">
       <div class="tablist" role="tablist" aria-label="Quick start guides">
-        <button class="tab" role="tab" type="button" id="tab-proxy" aria-controls="panel-proxy" aria-selected="true" tabindex="0">Circuit breaker proxy</button>
-        <button class="tab" role="tab" type="button" id="tab-stack" aria-controls="panel-stack" aria-selected="false" tabindex="-1">Observability stack</button>
+        <button class="tab" role="tab" type="button" id="tab-proxy" aria-controls="panel-proxy" aria-selected="true" tabindex="0">Circuit breaker</button>
+        <button class="tab" role="tab" type="button" id="tab-mon" aria-controls="panel-mon" aria-selected="false" tabindex="-1">Breaker dashboard</button>
+        <button class="tab" role="tab" type="button" id="tab-stack" aria-controls="panel-stack" aria-selected="false" tabindex="-1">LiteLLM stack</button>
         <button class="tab" role="tab" type="button" id="tab-chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1">Full chain</button>
       </div>
 
       <div class="tabpanel" role="tabpanel" id="panel-proxy" aria-labelledby="tab-proxy" tabindex="0">
-        <h3 class="pl">Circuit breaker proxy</h3>
-        <p>Needs Go 1.26 or newer. <code>go.sum</code> isn&rsquo;t committed, so run <code>go mod tidy</code> once after cloning.</p>
+        <h3 class="pl">Circuit breaker</h3>
+        <p>Needs Go 1.26.6 or newer, Linux or macOS, and a C compiler (cgo builds the plugins).</p>
         <div class="code">
           <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy proxy setup commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
 <pre tabindex="0"><code>git clone https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker.git
 cd AI-Ciurcit-Breaker
-go mod tidy
-go build -o proxy-server main.go
-./proxy-server -port 8080 -target http://localhost:4000</code></pre>
+./test.sh                  <span class="c"># builds the plugins and ./circuit-breaker, then runs the tests</span>
+<span class="c"># or build only: cd plugins &amp;&amp; make &amp;&amp; cd .. &amp;&amp; go build -o circuit-breaker .</span>
+cp config.example.yaml config.yaml
+<span class="c"># edit config.yaml: set server.target_url to your API, e.g. "http://localhost:4000"</span>
+./circuit-breaker</code></pre>
         </div>
         <ul>
-          <li>Point your agent at <code>http://localhost:8080/v1</code>.</li>
-          <li>Always pass <code>-target</code>: the default is <code>http://localhost:3000</code>, which is Grafana in the observability stack.</li>
-          <li>Add <code>-show-sliding-window</code> for the live terminal dashboard.</li>
+          <li>Start it from the repository root: the plugin paths in <code>config.yaml</code> are relative.</li>
+          <li>Check the startup line <code>Active measures:</code> lists six plugins. &ldquo;No plugins loaded&rdquo; means traffic passes unprotected.</li>
+          <li>Point your agent at <code>http://localhost:8080/v1</code> and send an <code>X-Session-ID</code> header per agent run.</li>
+          <li>Always set the target: the default, <code>http://localhost:3000</code>, is Grafana in the LiteLLM stack.</li>
+          <li>For load tests, add <code>-save-conversations=false</code>: saving every turn to disk is slow.</li>
         </ul>
+        <div class="callout">
+          <p><b>macOS:</b> if the log shows <code>failed to load native plugin</code> with &ldquo;chained fixups&rdquo;, rebuild the plugins with these linker flags, then start the proxy again.</p>
+          <div class="code">
+            <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy macOS plugin build commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>for p in simhash jaccard velocity error_acc entropy policy; do
+  go build -buildmode=plugin \
+    -ldflags="-linkmode=external -extldflags=-Wl,-no_fixup_chains" \
+    -o plugins/$p.so ./plugins/$p
+done</code></pre>
+          </div>
+        </div>
         <div class="code">
           <div class="code-bar"><span>tests</span><button class="copy" type="button" aria-label="Copy test commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
 <pre tabindex="0"><code>go test ./...
 go test -race ./...
 go vet ./...
-go test -bench=BenchmarkEntropy -benchmem ./inspector</code></pre>
+go test -run '^$' -bench . -benchmem ./stream</code></pre>
         </div>
       </div>
 
+      <div class="tabpanel" role="tabpanel" id="panel-mon" aria-labelledby="tab-mon" tabindex="0">
+        <h3 class="pl">Breaker dashboard</h3>
+        <p>Needs a build of the proxy (<code>./test.sh</code>), Docker with Compose, and python3 with the <code>openai</code> package for the demo traffic.</p>
+        <div class="code">
+          <div class="code-bar"><span>shell, in AI-Ciurcit-Breaker</span><button class="copy" type="button" aria-label="Copy breaker dashboard commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre tabindex="0"><code>pip install openai
+cd monitoring &amp;&amp; ./up.sh
+open http://localhost:3001/d/circuit-breaker
+./down.sh                  <span class="c"># stop everything</span></code></pre>
+        </div>
+        <ul>
+          <li><code>up.sh</code> starts a webhook sink, the proxy on <code>:8080</code>, a demo traffic loop, Prometheus on <code>:9090</code> and Grafana on <code>:3001</code>. It stops if any of those ports is busy.</li>
+          <li><code>./up.sh --no-traffic</code> starts only the proxy and the monitoring; point your own agents at <code>http://localhost:8080/v1</code>.</li>
+          <li>Grafana opens the dashboard without signing in; use <code>admin</code> / <code>admin</code> to edit it.</li>
+          <li>Check <code>curl -s localhost:8080/metrics | grep active_measures</code> reports 7: the six plugins plus tool-guard.</li>
+        </ul>
+      </div>
+
       <div class="tabpanel" role="tabpanel" id="panel-stack" aria-labelledby="tab-stack" tabindex="0">
-        <h3 class="pl">Observability stack</h3>
+        <h3 class="pl">LiteLLM stack</h3>
         <p>Needs Docker with Compose, plus API keys for the providers you plan to use.</p>
         <div class="code">
-          <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy observability stack commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+          <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy LiteLLM stack commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
 <pre tabindex="0"><code>git clone https://github.com/KareemEl-Giushy/AI-Monitoring.git
 cd AI-Monitoring
 cp .env.example .env
@@ -1040,15 +1368,15 @@ docker compose ps</code></pre>
 
       <div class="tabpanel" role="tabpanel" id="panel-chain" aria-labelledby="tab-chain" tabindex="0">
         <h3 class="pl">Full chain</h3>
-        <p>Agent &rarr; Circuit Breaker <code>:8080</code> &rarr; LiteLLM <code>:4000</code> &rarr; providers. Start the stack, put the proxy in front of it, then call a model through the proxy.</p>
+        <p>Agent &rarr; Circuit Breaker <code>:8080</code> &rarr; LiteLLM <code>:4000</code> &rarr; providers. Start the LiteLLM stack, put the proxy in front of it, then call a model through the proxy.</p>
         <div class="code">
           <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy full chain commands"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
-<pre tabindex="0"><code><span class="c"># Terminal 1: gateway + observability</span>
+<pre tabindex="0"><code><span class="c"># Terminal 1: gateway + its observability</span>
 cd AI-Monitoring &amp;&amp; docker compose up -d
 
-<span class="c"># Terminal 2: circuit breaker proxy in front of LiteLLM</span>
+<span class="c"># Terminal 2: the circuit breaker in front of LiteLLM</span>
 cd AI-Ciurcit-Breaker
-./proxy-server -port 8080 -target http://localhost:4000
+TARGET_URL=http://localhost:4000 ./circuit-breaker
 
 <span class="c"># Terminal 3: call a model through the proxy</span>
 export LITELLM_MASTER_KEY=sk-1234   <span class="c"># use the value from your .env</span>
@@ -1058,15 +1386,15 @@ curl -sS http://localhost:8080/v1/chat/completions \
   -H "X-Session-ID: demo-agent-1" \
   -d '{"model":"qwen3.6-27b","messages":[{"role":"user","content":"Say hello in five words."}]}'</code></pre>
         </div>
-        <p>Watch a breaker trip without spending tokens: ten parallel requests on one session. The first five pass and the rest come back <code>429</code> with <code>VELOCITY_BLOCKED</code>.</p>
+        <p>Watch a breaker trip without spending tokens: 15 parallel requests on one session. About ten pass in that second; the rest come back <code>429</code> with <code class="nw">Retry-After: 5</code> and <code>HIGH_RPS_DETECTED</code>.</p>
         <div class="code">
           <div class="code-bar"><span>shell</span><button class="copy" type="button" aria-label="Copy velocity demo command"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
-<pre tabindex="0"><code>seq 1 10 | xargs -P10 -I{} curl -s -o /dev/null -w "%{http_code}\n" \
+<pre tabindex="0"><code>seq 1 15 | xargs -P15 -I{} curl -s -o /dev/null -w "%{http_code}\n" \
   http://localhost:8080/v1/models \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
   -H "X-Session-ID: burst-demo"</code></pre>
         </div>
-        <p>Give each agent its own <code>X-Session-ID</code>. Without it, every agent sharing the master key shares one velocity budget.</p>
+        <p>Give each agent its own <code>X-Session-ID</code>. Without it, the session comes from the API key plus the conversation&rsquo;s opening messages. The breaker&rsquo;s monitoring stack and the LiteLLM stack both use port <code>9090</code>, so run one of them at a time.</p>
       </div>
     </div>
   </div>
@@ -1076,21 +1404,45 @@ curl -sS http://localhost:8080/v1/chat/completions \
 <section class="band" id="config" aria-labelledby="cfg-title">
   <div class="wrap">
     <h2 id="cfg-title">Key settings</h2>
-    <p class="lede">Set any of these as a CLI flag, an environment variable or a key in <code>config.yaml</code>. Flags win over environment variables, which win over the YAML file.</p>
+    <p class="lede">A CLI flag wins over an environment variable, which wins over <code>config.yaml</code>, which wins over the built-in default. Plugin thresholds live in <code>config.yaml</code>, under each plugin&rsquo;s <code>config</code>.</p>
     <table class="cfg">
       <thead><tr><th scope="col">Flag</th><th scope="col">Env var</th><th scope="col">Default</th><th scope="col">What it controls</th></tr></thead>
       <tbody>
+        <tr><td><code>-config</code></td><td data-l="Env"><code>CONFIG_FILE</code></td><td data-l="Default"><code>config.yaml</code></td><td>YAML file with the server settings and the plugin list</td></tr>
         <tr><td><code>-port</code></td><td data-l="Env"><code>PORT</code></td><td data-l="Default"><code>8080</code></td><td>Port the proxy listens on</td></tr>
-        <tr><td><code>-target</code></td><td data-l="Env"><code>TARGET_URL</code></td><td data-l="Default"><code>http://localhost:3000</code></td><td>Upstream base URL. Use <code>http://localhost:4000</code> for LiteLLM.</td></tr>
-        <tr><td><code>-cb-max-tool-repeats</code></td><td data-l="Env"><code>CB_MAX_TOOL_REPEATS</code></td><td data-l="Default"><code>3</code></td><td>Similar tool calls that trip CB-01</td></tr>
-        <tr><td><code>-cb-jaccard-threshold</code></td><td data-l="Env"><code>CB_JACCARD_THRESHOLD</code></td><td data-l="Default"><code>0.85</code></td><td>3-gram similarity at which two calls count as the same</td></tr>
-        <tr><td><code>-cb-min-entropy</code></td><td data-l="Env"><code>CB_MIN_ENTROPY</code></td><td data-l="Default"><code>1.5</code></td><td>Entropy floor in bits/byte for CB-03</td></tr>
-        <tr><td><code>-velocity-max-rps</code></td><td data-l="Env"><code>VELOCITY_MAX_RPS</code></td><td data-l="Default"><code>5.0</code></td><td>Requests per second per session (0 = unlimited)</td></tr>
-        <tr><td><code>-window-max-tokens</code></td><td data-l="Env"><code>WINDOW_MAX_TOKENS</code></td><td data-l="Default"><code>0</code></td><td>Estimated token budget per window (0 = unlimited)</td></tr>
-        <tr><td><code>-enforce-limits</code></td><td data-l="Env"><code>ENFORCE_LIMITS</code></td><td data-l="Default"><code>false</code></td><td>Return 429 when the sliding-window budget is exceeded</td></tr>
+        <tr><td><code>-target</code></td><td data-l="Env"><code>TARGET_URL</code></td><td data-l="Default"><code>http://localhost:3000</code></td><td>Upstream OpenAI-compatible API. Use <code>http://localhost:4000</code> for LiteLLM.</td></tr>
+        <tr><td><code>-log-level</code></td><td data-l="Env"><code>LOG_LEVEL</code></td><td data-l="Default"><code>INFO</code></td><td><code>DEBUG</code>, <code>INFO</code>, <code>WARN</code> or <code>ERROR</code></td></tr>
+        <tr><td><code>-save-conversations</code></td><td data-l="Env"><code>SAVE_CONVERSATIONS</code></td><td data-l="Default"><code>true</code></td><td>Save every turn as JSON, including full prompts and tool output</td></tr>
+        <tr><td><code>-save-dir</code></td><td data-l="Env"><code>CONVERSATIONS_DIR</code></td><td data-l="Default"><code>./conversations</code></td><td>Where conversations are saved</td></tr>
+        <tr><td><code>-window-max-requests</code><br><code>-window-max-tokens</code></td><td data-l="Env"><code>WINDOW_MAX_REQUESTS</code><br><code>WINDOW_MAX_TOKENS</code></td><td data-l="Default"><code>0</code></td><td>Global request and estimated-token caps over the sliding window (0 = off)</td></tr>
+        <tr><td><code>-enforce-limits</code></td><td data-l="Env"><code>ENFORCE_LIMITS</code></td><td data-l="Default"><code>false</code></td><td>Return <code>429</code> when a window cap is exceeded</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>API_AUTH_TOKEN</code></td><td data-l="Default"><code>unset</code></td><td>Bearer token for the management API. Unset means read-only: no reset, detach or load.</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>FAIL_POLICY</code></td><td data-l="Default"><code>open</code></td><td>When a plugin errors or panics: <code>open</code> lets the request through, <code>closed</code> blocks it</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>WEBHOOK_URLS</code></td><td data-l="Default"><code>none</code></td><td>Comma-separated URLs that receive each incident as JSON</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>METRICS_ENABLED</code></td><td data-l="Default"><code>true</code></td><td>Expose Prometheus metrics</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>METRICS_PATH</code></td><td data-l="Default"><code>/metrics</code></td><td>Metrics URL path</td></tr>
+        <tr><td><span class="na">env only</span></td><td data-l="Env"><code>METRICS_ADDR</code></td><td data-l="Default"><code>proxy port</code></td><td>Serve metrics on their own address, for example <code>:9091</code></td></tr>
       </tbody>
     </table>
-    <p class="more"><a href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker#configuration-reference">All 21 settings in the README</a></p>
+    <p class="more"><a href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker#configuration">Full reference in the README and config.example.yaml</a></p>
+  </div>
+</section>
+
+<!-- ================= TEAM ================= -->
+<section class="team" id="team" aria-labelledby="team-title">
+  <div class="wrap team-grid">
+    <div class="team-id">
+      <img src="logo-64.png" alt="" width="56" height="56">
+      <div>
+        <h2 id="team-title">Team MarsadOps</h2>
+        <p>Observation &amp; Protection Engineering. Built for DevOps Hackathon Egypt 2026.</p>
+      </div>
+    </div>
+    <ul class="crew">
+      <li><b>Omar Waleed Zehom</b><span>Software Engineer</span></li>
+      <li><b>Kareem El-Giushy</b><span>AI Engineer</span></li>
+      <li><b>Sohaila Ahmed</b><span>AI Engineer</span></li>
+    </ul>
   </div>
 </section>
 
@@ -1104,7 +1456,7 @@ curl -sS http://localhost:8080/v1/chat/completions \
     </div>
     <ul>
       <li><a href="https://github.com/KareemEl-Giushy/AI-Ciurcit-Breaker">Circuit breaker proxy on GitHub</a></li>
-      <li><a href="https://github.com/KareemEl-Giushy/AI-Monitoring">Observability stack on GitHub</a></li>
+      <li><a href="https://github.com/KareemEl-Giushy/AI-Monitoring">LiteLLM stack on GitHub</a></li>
     </ul>
   </div>
 </footer>
@@ -1115,7 +1467,6 @@ curl -sS http://localhost:8080/v1/chat/completions \
 (function () {
   'use strict';
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var enc = new TextEncoder();
   var announce = document.getElementById('announce');
   function say(msg) { announce.textContent = ''; setTimeout(function () { announce.textContent = msg; }, 30); }
 
@@ -1138,7 +1489,7 @@ curl -sS http://localhost:8080/v1/chat/completions \
 
   /* ---------- JSON highlighting ---------- */
   function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  var HOT = /^"(OPEN_TRIPPED|VELOCITY_BLOCKED|TOOL_CALL_REPETITION_LOOP|TOOL_ERROR_ACCUMULATION|MODEL_DEGENERATION_LOW_ENTROPY)"$/;
+  var HOT = /^"(OPEN_TRIPPED|VELOCITY_BLOCKED|POLICY_BLOCKED|TOOL_CALL_REPETITION_LOOP|TOOL_ERROR_ACCUMULATION|HIGH_RPS_DETECTED|ENDPOINT_REPEAT_EXCEEDED|DECLARATIVE_POLICY_VIOLATION|MODEL_DEGENERATION_LOW_ENTROPY|MODEL_DEGENERATION_REPETITION)"$/;
   function highlight(src) {
     var re = /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}\[\],])/g;
     var out = '', last = 0, m;
@@ -1176,7 +1527,7 @@ curl -sS http://localhost:8080/v1/chat/completions \
     if (d.c !== undefined) setCount(+d.c);
     if (d.j) ro.j.textContent = d.j;
     if (d.h) ro.h.textContent = d.h;
-    if (d.e) ro.e.textContent = d.e;
+    if (d.r) ro.r.textContent = d.r;
     if (d.trip) {
       setState(true);
       if (!reduce) { inst.classList.remove('flash'); void inst.offsetWidth; inst.classList.add('flash'); }
@@ -1185,7 +1536,7 @@ curl -sS http://localhost:8080/v1/chat/completions \
   function reset() {
     timers.forEach(clearTimeout); timers = [];
     setState(false); setCount(0);
-    ro.j.textContent = '\u2013'; ro.h.textContent = '\u2013'; ro.e.textContent = '\u2013';
+    ro.j.textContent = '\u2013'; ro.h.textContent = '\u2013'; ro.r.textContent = '\u2013';
     lines.forEach(function (li) { li.hidden = true; li.classList.remove('in'); });
     term.scrollTop = 0;
   }
@@ -1232,8 +1583,29 @@ curl -sS http://localhost:8080/v1/chat/completions \
     });
   });
 
-  /* ---------- Go-exact detector math (inspector/fingerprint.go, entropy.go) ---------- */
-  // strings.TrimSpace: Unicode White_Space as Go's unicode.IsSpace sees it
+  /* ==== detector math (mirrors inspector/toolcalls.go, plugins/{simhash,jaccard,entropy}, stream/entropy.go) ==== */
+  var enc = new TextEncoder();
+  function u8len(s) { return enc.encode(s).length; }
+  // Go decodes lone UTF-16 surrogates in JSON strings to U+FFFD
+  function wellFormed(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xD800 && c <= 0xDBFF) {
+        var d = s.charCodeAt(i + 1);
+        if (d >= 0xDC00 && d <= 0xDFFF) { out += s[i] + s[i + 1]; i++; } else out += '\uFFFD';
+      } else out += (c >= 0xDC00 && c <= 0xDFFF) ? '\uFFFD' : s[i];
+    }
+    return out;
+  }
+  // inspector.maskString: ISO timestamps -> <ts>, UUIDs -> <id>, tokens of 16+ chars with a digit -> <tok>
+  var RE_TS = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?/g;
+  var RE_ID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+  var RE_TOK = /\b[A-Za-z0-9+\/_-]*\d[A-Za-z0-9+\/_-]*={0,2}/g;
+  function maskString(s) {
+    return s.replace(RE_TS, '<ts>').replace(RE_ID, '<id>').replace(RE_TOK, function (t) { return t.length >= 16 ? '<tok>' : t; });
+  }
+  // strings.TrimSpace (Unicode White_Space, as Go's unicode.IsSpace sees it)
   var WS = /^[\t\n\v\f\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+|[\t\n\v\f\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+$/g;
   function goTrim(s) { return s.replace(WS, ''); }
   function bytesCmp(a, b) {
@@ -1241,6 +1613,7 @@ curl -sS http://localhost:8080/v1/chat/completions \
     for (var i = 0; i < n; i++) if (x[i] !== y[i]) return x[i] - y[i];
     return x.length - y.length;
   }
+  // encoding/json string output: HTML-safe escapes plus U+2028/U+2029
   function goString(s) {
     return JSON.stringify(s).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
       .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -1254,68 +1627,170 @@ curl -sS http://localhost:8080/v1/chat/completions \
     if (typeof v === 'string') return goString(v);
     return JSON.stringify(v);
   }
-  // NormalizeJSONArgs: valid JSON is re-marshalled (sorted keys, compact); otherwise TrimSpace
-  function normalizeArgs(s) { try { return goMarshal(JSON.parse(s)); } catch (e) { return goTrim(s); } }
-  function isJSON(s) { try { JSON.parse(s); return true; } catch (e) { return false; } }
-  // JaccardSimilarity: trim; equal -> 1; empty -> 0; < 3 bytes -> rune sets; else byte 3-gram sets
-  function jaccard(s1, s2) {
-    s1 = goTrim(s1); s2 = goTrim(s2);
-    if (s1 === s2) return { j: 1, mode: 'identical' };
-    if (s1 === '' || s2 === '') return { j: 0, mode: 'empty' };
-    var b1 = enc.encode(s1), b2 = enc.encode(s2), A = new Set(), B = new Set(), mode, i;
-    if (b1.length < 3 || b2.length < 3) {
-      mode = 'runes';
-      Array.from(s1).forEach(function (r) { A.add(r); });
-      Array.from(s2).forEach(function (r) { B.add(r); });
-    } else {
-      mode = '3gram';
-      for (i = 0; i + 3 <= b1.length; i++) A.add((b1[i] << 16) | (b1[i + 1] << 8) | b1[i + 2]);
-      for (i = 0; i + 3 <= b2.length; i++) B.add((b2[i] << 16) | (b2[i + 1] << 8) | b2[i + 2]);
+  // maskArgValue: every JSON number becomes "<n>", strings are masked, keys kept
+  function maskArg(v) {
+    if (typeof v === 'number') return '<n>';
+    if (typeof v === 'string') return maskString(wellFormed(v));
+    if (Array.isArray(v)) return v.map(maskArg);
+    if (v && typeof v === 'object') {
+      var o = {};
+      Object.keys(v).forEach(function (k) { o[wellFormed(k)] = maskArg(v[k]); });
+      return o;
     }
-    var inter = 0;
+    return v;
+  }
+  function finite(v) {
+    if (typeof v === 'number') return isFinite(v);
+    if (v && typeof v === 'object') return Object.keys(v).every(function (k) { return finite(v[k]); });
+    return true;
+  }
+  // inspector.NormalizeToolArgs
+  function normalizeArgs(s) {
+    var v, ok = true;
+    try { v = JSON.parse(s); ok = finite(v); } catch (e) { ok = false; }
+    return ok ? { key: goMarshal(maskArg(v)), json: true } : { key: maskString(goTrim(s)), json: false };
+  }
+  // jaccard plugin: character (rune) 3-gram sets; strings under 3 runes are one gram
+  function grams(s) {
+    var r = Array.from(s), g = new Set();
+    if (r.length < 3) { g.add(s); return g; }
+    for (var i = 0; i + 3 <= r.length; i++) g.add(r[i] + r[i + 1] + r[i + 2]);
+    return g;
+  }
+  function jaccard(a, b) {
+    var A = grams(a), B = grams(b), inter = 0;
     A.forEach(function (x) { if (B.has(x)) inter++; });
     var union = A.size + B.size - inter;
-    return { j: union === 0 ? 0 : inter / union, mode: mode, a: A.size, b: B.size, inter: inter, union: union };
+    return { j: union === 0 ? 0 : inter / union, a: A.size, b: B.size, inter: inter, union: union };
   }
-  // CalculateStringEntropy: 256-bin byte histogram, H = log2(N) - (1/N) * sum(c * log2 c), clamped at 0
-  function entropy(str) {
-    var bytes = enc.encode(str), n = bytes.length;
-    var freq = new Uint32Array(256);
-    for (var i = 0; i < n; i++) freq[bytes[i]]++;
-    if (n === 0) return { h: 0, n: 0, freq: freq };
+  // simhash plugin: 64-bit SimHash over rune 3-shingles, each hashed with FNV-64a
+  var M64 = (BigInt(1) << BigInt(64)) - BigInt(1), FNV_OFF = BigInt('14695981039346656037'), FNV_PRIME = BigInt('1099511628211');
+  function fnv64a(str) {
+    var h = FNV_OFF, b = enc.encode(str);
+    for (var i = 0; i < b.length; i++) { h ^= BigInt(b[i]); h = (h * FNV_PRIME) & M64; }
+    return h;
+  }
+  function simhash(s) {
+    var r = Array.from(s);
+    if (r.length < 3) return fnv64a(s);
+    var v = new Array(64).fill(0), j;
+    for (var i = 0; i + 3 <= r.length; i++) {
+      var h = fnv64a(r[i] + r[i + 1] + r[i + 2]);
+      for (j = 0; j < 64; j++) v[j] += ((h >> BigInt(j)) & BigInt(1)) ? 1 : -1;
+    }
+    var res = BigInt(0);
+    for (j = 0; j < 64; j++) if (v[j] > 0) res |= BigInt(1) << BigInt(j);
+    return res;
+  }
+  function hamming(a, b) { var x = a ^ b, d = 0; while (x > BigInt(0)) { d += Number(x & BigInt(1)); x >>= BigInt(1); } return d; }
+  var LOOP = { jaccard: 0.8, hamming: 3, longArgs: 256 };
+  // Would call b count as a repeat of call a? (same tool; the result must also be unchanged)
+  function compareCalls(a, b) {
+    var na = normalizeArgs(a), nb = normalizeArgs(b);
+    var long = u8len(na.key) >= LOOP.longArgs || u8len(nb.key) >= LOOP.longArgs;
+    var ha = simhash(na.key), hb = simhash(nb.key), dist = hamming(ha, hb);
+    var jr = long ? null : jaccard(nb.key, na.key);
+    var exact = na.key === nb.key;
+    return {
+      na: na, nb: nb, long: long, exact: exact, jr: jr, dist: dist,
+      ha: ha.toString(16).padStart(16, '0'), hb: hb.toString(16).padStart(16, '0'),
+      jSame: long ? exact : jr.j >= LOOP.jaccard,
+      sSame: long ? exact : dist <= LOOP.hamming
+    };
+  }
+  // stream.EntropyCalculator.RollingEntropy: Shannon entropy of the last 1024 bytes, bits per byte
+  function shannon(freq, n) {
+    if (n === 0) return 0;
     var sum = 0;
     for (var k = 0; k < 256; k++) if (freq[k] > 0) sum += freq[k] * Math.log2(freq[k]);
     var h = Math.log2(n) - sum / n;
-    return { h: h < 0 ? 0 : h, n: n, freq: freq };
+    return h < 0 ? 0 : h;
   }
+  var DEGEN = { minEntropy: 1.5, minBytes: 256, minDistinct: 0.15, windowRunes: 2048, minRunes: 256, ngram: 8, every: 32, shortWindow: 512, ring: 1024, delta: 4 };
+  // entropy plugin distinctRatio over runes [from, to): distinct 8-rune sequences / all 8-rune sequences
+  // (Go hashes each sequence with 64-bit FNV-1a; exact ids give the same count barring a hash collision)
+  function makeRatio(ids) {
+    var stamp = new Uint32Array(ids.length + 1), gen = 0;
+    return function (from, to) {
+      var total = to - from - DEGEN.ngram + 1;
+      if (total <= 0) return 1;
+      gen++;
+      var distinct = 0;
+      for (var p = from; p < from + total; p++) { var id = ids[p]; if (stamp[id] !== gen) { stamp[id] = gen; distinct++; } }
+      return distinct / total;
+    };
+  }
+  function windowRatio(ratio, end) {
+    var start = Math.max(0, end - DEGEN.windowRunes), r = ratio(start, end);
+    if (end - start > DEGEN.shortWindow) { var s = ratio(end - DEGEN.shortWindow, end); if (s < r) r = s; }
+    return r;
+  }
+  // Replays text through the entropy plugin as a stream of 4-character deltas (stream/response.go order)
+  function streamCheck(text) {
+    var runes = Array.from(text), N = runes.length, ids = new Uint32Array(Math.max(0, N - DEGEN.ngram + 1)), map = new Map(), i;
+    for (i = 0; i + DEGEN.ngram <= N; i++) {
+      var g = runes.slice(i, i + DEGEN.ngram).join(''), id = map.get(g);
+      if (id === undefined) { id = map.size; map.set(g, id); }
+      ids[i] = id;
+    }
+    var ratio = makeRatio(ids);
+    var ring = new Uint8Array(DEGEN.ring), rfreq = new Uint32Array(256), head = 0, rlen = 0, total = 0;
+    var fed = 0, since = 0, h = 0, res = null;
+    for (i = 0; i < N && !res; i += DEGEN.delta) {
+      var d = runes.slice(i, i + DEGEN.delta), bytes = enc.encode(d.join(''));
+      for (var k = 0; k < bytes.length; k++) {
+        var b = bytes[k];
+        if (rlen < DEGEN.ring) { rlen++; } else { rfreq[ring[head]]--; }
+        ring[head] = b; rfreq[b]++; head = (head + 1) % DEGEN.ring; total++;
+      }
+      fed += d.length; since += d.length;
+      h = shannon(rfreq, rlen);
+      if (total >= DEGEN.minBytes && h < DEGEN.minEntropy) { res = { trip: 'MODEL_DEGENERATION_LOW_ENTROPY' }; break; }
+      var wlen = Math.min(fed, DEGEN.windowRunes);
+      if (wlen >= DEGEN.minRunes && since >= DEGEN.every) {
+        since = 0;
+        var r = windowRatio(ratio, fed);
+        if (r < DEGEN.minDistinct) { res = { trip: 'MODEL_DEGENERATION_REPETITION', ratio: r }; break; }
+      }
+    }
+    res = res || { trip: null };
+    res.bytes = total; res.runes = fed; res.entropy = h; res.freq = rfreq; res.judged = total >= DEGEN.minBytes;
+    if (res.ratio === undefined) res.ratio = fed >= DEGEN.minRunes ? windowRatio(ratio, fed) : null;
+    res.finalRatio = N >= DEGEN.minRunes ? windowRatio(ratio, N) : null;
+    return res;
+  }
+  /* ==== end detector math ==== */
 
-  /* ---------- Jaccard calculator ---------- */
-  var JT = 0.85;
+  /* ---------- similarity calculator ---------- */
   var ja = document.getElementById('j-a'), jb = document.getElementById('j-b');
   var jVal = document.getElementById('j-val'), jPill = document.getElementById('j-pill'), jMeter = document.getElementById('j-meter');
-  var jVerdict = document.getElementById('j-verdict');
-  function fmtJ(j) { var s = j.toFixed(3); if (j < JT && s === '0.850') s = j.toFixed(4); return s; }
+  var jSim = document.getElementById('j-sim'), jVerdict = document.getElementById('j-verdict');
+  function fmtJ(j) { return (j < LOOP.jaccard ? Math.floor(j * 1000) / 1000 : j).toFixed(3); }
   function runJ() {
-    var na = normalizeArgs(ja.value), nb = normalizeArgs(jb.value);
-    var r = jaccard(nb, na);
-    var structured = isJSON(na) && isJSON(nb);
-    var match = r.j >= JT;
-    jVal.textContent = fmtJ(r.j);
-    jPill.textContent = match ? 'MATCH' : 'NO MATCH';
-    var cls = match ? 'v-match' : 'v-ok';
+    var r = compareCalls(ja.value, jb.value);
+    var blank = !goTrim(ja.value) && !goTrim(jb.value);
+    var repeat = r.jSame || r.sSame;
+    jVal.textContent = r.long ? 'exact' : fmtJ(r.jr.j);
+    jPill.textContent = blank ? 'EMPTY' : repeat ? 'REPEAT' : 'NEW WORK';
+    var cls = blank ? 'v-idle' : repeat ? 'v-match' : 'v-ok';
     jPill.className = 'pill ' + cls; jMeter.className = 'meter ' + cls;
-    jMeter.querySelector('.fill').style.width = (r.j * 100).toFixed(1) + '%';
-    var extra = structured ? '' : ' These are free-form arguments, so SimHash can also match them (not computed here).';
-    if (r.mode === 'empty') jVerdict.innerHTML = '<b>Nothing to compare.</b> Enter arguments in both boxes.';
-    else if (match) jVerdict.innerHTML = '<b>Near-duplicate.</b> This call counts toward the loop limit; the 3rd similar call trips CB-01.' + esc(extra);
-    else jVerdict.innerHTML = '<b>Different enough.</b> This pair does not count toward the loop limit.' + esc(extra);
-    document.getElementById('j-na').textContent = na || '(empty)';
-    document.getElementById('j-nb').textContent = nb || '(empty)';
-    var sets = r.mode === '3gram' ? r.inter + ' shared of ' + r.union + ' distinct 3-grams (' + r.a + ' previous, ' + r.b + ' current)'
-      : r.mode === 'runes' ? r.inter + ' shared of ' + r.union + ' distinct characters (input under 3 bytes)'
-      : r.mode === 'identical' ? 'Identical after normalization, so similarity is 1' : 'One side is empty';
-    document.getElementById('j-sets').textContent = sets;
-    document.getElementById('j-mode').textContent = structured ? 'Both are JSON: keys sorted, whitespace removed. Jaccard alone decides.' : 'Free-form text: trimmed only. Jaccard or SimHash can match.';
+    jMeter.querySelector('.fill').style.width = r.long ? (r.exact ? '100%' : '0%') : (r.jr.j * 100).toFixed(1) + '%';
+    jSim.innerHTML = r.long ? 'Long arguments: compared <b>exactly</b>, not by similarity'
+      : 'SimHash: <b>' + r.dist + (r.dist === 1 ? ' bit' : ' bits') + '</b> apart (a match needs &le; 3)';
+    var tail = ' If the tool&rsquo;s result is also unchanged, the 3rd such call within 60&nbsp;s is blocked with 403 TOOL_CALL_REPETITION_LOOP.';
+    if (blank) jVerdict.innerHTML = '<b>Nothing to compare.</b> Enter arguments in both boxes.';
+    else if (r.long) jVerdict.innerHTML = r.exact ? '<b>Counts as a repeat:</b> long arguments (256+ bytes) that match exactly.' + tail
+      : '<b>New work.</b> Arguments of 256+ bytes must match exactly, and these differ.';
+    else if (repeat) jVerdict.innerHTML = '<b>Counts as a repeat:</b> ' + (r.jSame && r.sSame ? 'Jaccard and SimHash both match.' : r.jSame ? 'Jaccard matches, SimHash doesn&rsquo;t.' : 'SimHash matches, Jaccard doesn&rsquo;t.') + tail;
+    else jVerdict.innerHTML = '<b>New work.</b> Neither loop plugin counts this call as a repeat.';
+    document.getElementById('j-na').textContent = r.na.key || '(empty)';
+    document.getElementById('j-nb').textContent = r.nb.key || '(empty)';
+    document.getElementById('j-sets').textContent = r.long ? 'Not used: at least one side is 256+ bytes after normalization'
+      : r.jr.inter + ' shared of ' + r.jr.union + ' distinct 3-grams (' + r.jr.a + ' previous, ' + r.jr.b + ' current)';
+    document.getElementById('j-fp').textContent = r.ha + ' vs ' + r.hb + ', ' + r.dist + ' bits differ';
+    document.getElementById('j-mode').textContent = (r.na.json && r.nb.json)
+      ? 'JSON: keys sorted, every number becomes "<n>", timestamps, UUIDs and long tokens masked. Go\u2019s encoder writes < and > as \\u003c and \\u003e.'
+      : 'Plain text: trimmed, then timestamps, UUIDs and long tokens masked.';
   }
   ja.addEventListener('input', runJ); jb.addEventListener('input', runJ);
   Array.prototype.forEach.call(document.querySelectorAll('[data-ja]'), function (b) {
@@ -1324,26 +1799,32 @@ curl -sS http://localhost:8080/v1/chat/completions \
   document.getElementById('calc-j').addEventListener('submit', function (e) { e.preventDefault(); });
   runJ();
 
-  /* ---------- entropy calculator ---------- */
-  var ET = 1.5;
+  /* ---------- degeneration calculator ---------- */
   var SAMPLES = {
-    healthy: 'The pod is OOMKilled: its memory limit is lower than what the container needs at startup. Raise the limit in the deployment spec, or lower the heap size.',
-    spam: new Array(41).join('! ')
+    healthy: document.getElementById('e-in').value,
+    noise: new Array(161).join('! '),
+    loop: new Array(31).join('I apologize for the confusion. '),
+    short: new Array(49).join('! ')
   };
   var ein = document.getElementById('e-in');
   var eVal = document.getElementById('e-val'), ePill = document.getElementById('e-pill'), eMeter = document.getElementById('e-meter');
-  var eVerdict = document.getElementById('e-verdict'), eHist = document.getElementById('e-hist'), eCap = document.getElementById('e-hist-cap');
-  function label(h) { return h < 2 ? 'low diversity, degeneration risk' : h < 3.5 ? 'moderate diversity' : 'high diversity'; }
+  var eRep = document.getElementById('e-rep'), eVerdict = document.getElementById('e-verdict');
+  var eHist = document.getElementById('e-hist'), eCap = document.getElementById('e-hist-cap');
+  function fmtH(h) { return (h < DEGEN.minEntropy ? Math.floor(h * 100) / 100 : h).toFixed(2); }
+  function pct(x) { return x < 0.2 ? (Math.floor(x * 1000) / 10).toFixed(1) + '%' : Math.round(x * 100) + '%'; }
   function runE() {
-    var r = entropy(ein.value);
-    eVal.innerHTML = r.h.toFixed(2) + '<small>bits/byte</small>';
+    var r = streamCheck(ein.value), h = fmtH(r.entropy), win = Math.min(r.bytes, DEGEN.ring);
+    eVal.innerHTML = h + '<small>bits/byte</small>';
     var state, pill, msg;
-    if (r.n === 0) { state = 'v-idle'; pill = 'EMPTY'; msg = '<b>Type or paste some text.</b>'; }
-    else if (r.n < 64) { state = 'v-idle'; pill = 'TOO SHORT'; msg = '<b>Not checked yet.</b> ' + r.n + ' bytes; message content is judged from 64 bytes (tool arguments from 30).'; }
-    else if (r.h < ET) { state = 'v-trip'; pill = 'TRIP'; msg = '<b>Trips CB-03</b> with MODEL_DEGENERATION_LOW_ENTROPY. ' + r.n + ' bytes, ' + label(r.h) + '.'; }
-    else { state = 'v-ok'; pill = 'PASS'; msg = '<b>Passes.</b> ' + r.n + ' bytes, ' + label(r.h) + ', above the 1.5 bits/byte floor.'; }
+    if (!r.bytes) { state = 'v-idle'; pill = 'EMPTY'; msg = '<b>Type or paste some text.</b>'; }
+    else if (!r.judged) { state = 'v-idle'; pill = 'TOO SHORT'; msg = '<b>Not judged yet.</b> ' + r.bytes + ' bytes; neither check runs until 256 bytes have streamed.'; }
+    else if (r.trip === 'MODEL_DEGENERATION_LOW_ENTROPY') { state = 'v-trip'; pill = 'CUT'; msg = '<b>Stream cut at byte ' + r.bytes + '</b> with MODEL_DEGENERATION_LOW_ENTROPY: the last ' + win + ' bytes average ' + h + ' bits/byte, below 1.5.'; }
+    else if (r.trip) { state = 'v-trip'; pill = 'CUT'; msg = '<b>Stream cut at byte ' + r.bytes + '</b> with MODEL_DEGENERATION_REPETITION: only ' + pct(r.ratio) + ' of the recent 8-character sequences are distinct, below 15%.'; }
+    else { state = 'v-ok'; pill = 'PASS'; msg = '<b>Passes.</b> ' + r.bytes + ' bytes streamed without tripping either check.'; }
     ePill.textContent = pill; ePill.className = 'pill ' + state; eMeter.className = 'meter ' + state;
-    eMeter.querySelector('.fill').style.width = Math.min(100, r.h / 8 * 100).toFixed(1) + '%';
+    eMeter.querySelector('.fill').style.width = Math.min(100, r.entropy / 8 * 100).toFixed(1) + '%';
+    eRep.innerHTML = r.ratio === null ? 'Repetition check: starts at 256 characters'
+      : 'Distinct 8-character sequences: <b>' + pct(r.ratio) + '</b> (cut below 15%)';
     eVerdict.innerHTML = msg;
     var counts = [];
     for (var k = 0; k < 256; k++) if (r.freq[k]) counts.push(r.freq[k]);
@@ -1351,9 +1832,10 @@ curl -sS http://localhost:8080/v1/chat/completions \
     var top = counts.slice(0, 48), max = top[0] || 1, html = '';
     top.forEach(function (c) { html += '<i style="height:' + Math.max(3, c / max * 100).toFixed(1) + '%"></i>'; });
     eHist.innerHTML = html;
-    eCap.textContent = counts.length ? 'Byte frequencies, most common first: ' + counts.length + ' distinct byte values.' : 'Byte frequencies appear here.';
+    eCap.textContent = counts.length ? 'Byte frequencies in the last ' + win + ' bytes, most common first: ' + counts.length + ' distinct byte values.' : 'Byte frequencies appear here.';
   }
-  ein.addEventListener('input', runE);
+  var eTimer;
+  ein.addEventListener('input', function () { clearTimeout(eTimer); eTimer = setTimeout(runE, 120); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-e]'), function (b) {
     b.addEventListener('click', function () { ein.value = SAMPLES[b.getAttribute('data-e')]; runE(); });
   });
